@@ -15,15 +15,16 @@ import { PermissionsAndroid } from "react-native"
 import Icon from "react-native-vector-icons/Ionicons"
 const { height } = Dimensions.get("window")
 
-const ChatView = () => {
-    const [input, setInput] = useState("")
-    const [messages, setMessages] = useState([])
-    const [isRecording, setIsRecording] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
-    const [isExpanded, setIsExpanded] = useState(false)
-    const scrollViewRef = useRef()
-    const animation = useRef(null)
-  
+const ChatView = ({sessionId, isConnected, clickConnection}) => {
+    const [input, setInput] = useState("") // 输入框内容
+    const [messages, setMessages] = useState([]) // 聊天内容
+    const [isRecording, setIsRecording] = useState(false) // 是否正在录音
+    const [isLoading, setIsLoading] = useState(false) // 是否正在加载
+    const [isExpanded, setIsExpanded] = useState(false) // 聊天内容是否展开
+
+    const scrollViewRef = useRef() // 滚动视图
+    const animation = useRef(null) // 动画
+
     const requestMicrophonePermission = async () => {
       try {
         const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, {
@@ -140,6 +141,7 @@ const ChatView = () => {
     };
 
     return (
+      isConnected ? (
         <View style={[
             styles.chatContainer, 
             isExpanded ? styles.chatContainerExpanded : null
@@ -185,13 +187,19 @@ const ChatView = () => {
             />
             <TouchableOpacity style={styles.voiceButton} onPress={handleVoiceInput}>
                 <Icon name={isRecording ? "mic" : "mic-outline"} size={24} color={isRecording ? "#ef4444" : "#3b82f6"} />
-                
             </TouchableOpacity>
             <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage} disabled={input.trim() === ""}>
                 <Icon name="send" size={24} color="white" />
             </TouchableOpacity>
             </View>
         </View>
+      ) : (
+        <View style={styles.connectionContainer}>
+          <TouchableOpacity style={styles.connectionButton} onPress={clickConnection}>
+            <Text style={styles.connectionButtonText}>连接</Text>
+          </TouchableOpacity>
+        </View>
+      )
     )
 }
 
@@ -216,6 +224,26 @@ const styles = StyleSheet.create({
         shadowRadius: 3,
         elevation: 3,
     },
+    connectionContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        flexDirection: "row",
+    },
+    connectionButton: {
+        padding: 10,
+        borderRadius: 30,
+        backgroundColor: "#3b82f6",
+        alignItems: "center",
+        flex: 1,
+        marginHorizontal: 10,
+        paddingVertical: 15,
+    },
+    connectionButtonText: {
+        color: "white",
+        fontSize: 16,
+    },
+        
     chatContainerExpanded: {
         maxHeight: "80%",
     },

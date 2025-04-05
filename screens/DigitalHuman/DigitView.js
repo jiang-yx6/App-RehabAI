@@ -1,28 +1,31 @@
-import React from 'react';
-import { BlurView } from "@react-native-community/blur"
+import React from "react"
 import {
     StyleSheet,
     View,
-    Image,
     Dimensions,
-  } from "react-native"
-  
+    Image,
+} from "react-native"
+import { RTCView } from 'react-native-webrtc';
+import { BlurView } from "@react-native-community/blur";
+
 const { width } = Dimensions.get("window")
 
-export const DigitView = () => {
+export const DigitView = ({ videoRef, isConnected, remoteStream }) => {
     return (
-    <View style={styles.digitalHumanContainer}>
-        <BlurView style={styles.blurView} blurType="light" blurAmount={5} reducedTransparencyFallbackColor="white">
-          <Image source={require("../../assets/model.png")} style={styles.digitalHuman} />
-          {/* <LottieView
-            ref={animation}
-            source={require("../assets/digital-human.json")}
-            style={styles.digitalHuman}
-            autoPlay
-            loop
-          /> */}
-        </BlurView>
-      </View>
+        <View style={styles.digitalHumanContainer}>
+            <BlurView style={styles.blurView} blurType="light" blurAmount={5} reducedTransparencyFallbackColor="white">
+                    {/* 可以在这里添加占位图片或加载动画 */}
+                    {isConnected && remoteStream ? (
+                        <RTCView 
+                        ref={videoRef}
+                        streamURL={remoteStream.toURL()}
+                        objectFit="cover"
+                        style={styles.digitalHuman} />
+                    ) : (
+                        <Image source={require('../../assets/model.png')} style={styles.digitalHuman} />
+                    )}
+            </BlurView>
+        </View>
     )
 }
 
