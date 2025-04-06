@@ -19,34 +19,13 @@ import Ionicons from "react-native-vector-icons/Ionicons"
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera'
 import { LineChart } from "react-native-chart-kit"
 
-import ChooseVideo from '../components/ChooseVideo'
-import ShowCamera from '../components/ShowCamera'
-import ShowResult from '../components/ShowResult'
+import ChooseVideo from './MotionAssess/ChooseVideo'
+import ShowCamera from './MotionAssess/ShowCamera'
+import ShowResult from './MotionAssess/ShowResult'
 
 const { width } = Dimensions.get("window")
 
-// Mock data for standard videos
-const standardVideos = [
-  {
-    id: "1",
-    title: "肩部康复动作",
-    thumbnail: require("../assets/shoulder.png"),
-    description: "适用于肩周炎和肩部术后康复",
-  },
-  {
-    id: "2",
-    title: "膝盖康复动作",
-    thumbnail: require("../assets/knee.png"),
-    description: "适用于膝关节损伤和术后康复",
-  },
-  {
-    id: "3",
-    title: "腰部康复动作",
-    thumbnail: require("../assets/back.png"),
-    description: "适用于腰椎间盘突出和腰肌劳损",
-  },
-//   { id: "4", title: "颈部康复动作", thumbnail: require("../assets/neck.png"), description: "适用于颈椎病和颈部疼痛" },
-]
+
 
 const MotionAssessmentScreen = () => {
   const [selectedStandardVideo, setSelectedStandardVideo] = useState(null)

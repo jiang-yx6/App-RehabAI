@@ -49,19 +49,36 @@ const ChatView = ({sessionId, isConnected, clickConnection}) => {
         text: input,
         isUser: true,
       }
-  
+      
       setMessages([...messages, userMessage])
       setInput("")
       setIsLoading(true)
-  
+      
+      // 发送消息到服务器
+      const response = await fetch('http://10.3.242.26:8020/human', {
+        method:'POST',
+        headers:{
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            text: userMessage.trim(),
+            type: 'echo',
+            interrupt: true,
+            sessionId: sessionId
+        })
+      });
+
       // Simulate AI response
-      setTimeout(() => {
+      setTimeout(async () => {
         const aiResponse = {
           id: Date.now() + 1,
           text: generateResponse(input),
           isUser: false,
         }
         setMessages((prev) => [...prev, aiResponse])
+        
+        
+
         setIsLoading(false)
       }, 1500)
     }

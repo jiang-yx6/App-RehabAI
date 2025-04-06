@@ -106,7 +106,7 @@ const DigitalHumanScreen = () => {
             console.log('开始协商过程...');
             // peerConnection.addTransceiver('video', { direction: 'recvonly' });
             // peerConnection.addTransceiver('audio', { direction: 'recvonly' });
-            // console.log('已添加音视频接收器');
+            console.log('已添加音视频接收器');
 
             const offer = await peerConnection.createOffer(sessionConstraints);
             await peerConnection.setLocalDescription(offer);
@@ -131,7 +131,7 @@ const DigitalHumanScreen = () => {
             });
 
             console.log('正在发送offer到服务器...');
-            const response = await fetch('http://10.3.242.26:8010/offer', {
+            const response = await fetch('http://10.3.242.26:8020/offer', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -144,8 +144,14 @@ const DigitalHumanScreen = () => {
 
             const answer = await response.json();
             console.log('收到服务器应答:', answer);
-            setSessionId(answer.sessionId);
-            console.log("sessionId",sessionId);
+            // 从响应中获取 sessionId
+            const { sessionid: newSessionId } = answer;
+            if (newSessionId) {
+                setSessionId(newSessionId);
+                console.log('设置新的 sessionId:', newSessionId);
+            } else {
+                console.warn('未能从服务器响应中获取 sessionId');
+            }
             await peerConnection.setRemoteDescription(answer);
             console.log('远程描述符设置完成，连接建立成功！');
         } catch (error) {

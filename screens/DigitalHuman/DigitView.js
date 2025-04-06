@@ -9,6 +9,7 @@ import { RTCView } from 'react-native-webrtc';
 import { BlurView } from "@react-native-community/blur";
 
 const { width } = Dimensions.get("window")
+const { height } = Dimensions.get("window")
 
 export const DigitView = ({ videoRef, isConnected, remoteStream }) => {
     return (
@@ -22,7 +23,7 @@ export const DigitView = ({ videoRef, isConnected, remoteStream }) => {
                         objectFit="cover"
                         style={styles.digitalHuman} />
                     ) : (
-                        <Image source={require('../../assets/model.png')} style={styles.digitalHuman} />
+                        <Image source={require('../../assets/doctor.jpg')} style={styles.digitalHuman} />
                     )}
             </BlurView>
         </View>
@@ -38,14 +39,14 @@ const styles = StyleSheet.create({
         overflow: "hidden",
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
-      },
-      blurView: {
+    },
+    blurView: {
         width: "100%",
         height: "100%",
-       
-      },
-      digitalHuman: {
+        overflow: "hidden",
+    },
+    digitalHuman: {
         width: width,
-        height: width,
-      },
+        height: height * 0.8,
+    },
 })

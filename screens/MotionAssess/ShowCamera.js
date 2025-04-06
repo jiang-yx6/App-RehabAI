@@ -58,6 +58,19 @@ const ShowCamera = ({
           />
         )}
 
+        {!isRecording && (
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={onCloseCamera}
+          >
+            <Ionicons 
+              name="arrow-back" 
+              size={25} 
+              color="white" 
+            />
+          </TouchableOpacity>
+        )}
+
         {countdown !== null && (
           <View style={styles.countdownContainer}>
             <Text style={styles.countdownText}>{countdown}</Text>
@@ -86,6 +99,19 @@ const styles = StyleSheet.create({
   cameraContainer: {
     flex: 1,
     backgroundColor: "black",
+  },
+  backButton: {
+    position: "absolute",
+    top: 40,
+    left: 20,
+    paddingHorizontal: 15,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000000,
   },
   countdownContainer: {
     position: "absolute",
