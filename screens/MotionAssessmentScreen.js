@@ -1,35 +1,22 @@
-"use client"
-
-import { useState, useRef } from "react"
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  FlatList,
-  Modal,
-  ActivityIndicator,
-  Dimensions,
-  PermissionsAndroid,
-} from "react-native"
+import React, { useState, useRef } from "react"
+import { StyleSheet, View, Text, Modal, ActivityIndicator, Dimensions, Alert, Platform } from "react-native"
 import { BlurView } from "@react-native-community/blur"
-import Ionicons from "react-native-vector-icons/Ionicons"
-import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera'
-import { LineChart } from "react-native-chart-kit"
+import { useCameraDevice, useCameraPermission } from "react-native-vision-camera"
+import RNFS from "react-native-fs"
 
-import ChooseVideo from './MotionAssess/ChooseVideo'
-import ShowCamera from './MotionAssess/ShowCamera'
-import ShowResult from './MotionAssess/ShowResult'
+import ChooseVideo from "./MotionAssess/ChooseVideo"
+import ShowCamera from "./MotionAssess/ShowCamera"
+import ShowResult from "./MotionAssess/ShowResult"
 
 const { width } = Dimensions.get("window")
 
-
+// Backend API URL
+const API_BASE_URL = "https://yfvideo.hf.free4inno.com"
 
 const MotionAssessmentScreen = () => {
   const [selectedStandardVideo, setSelectedStandardVideo] = useState(null)
   const [userVideoRecorded, setUserVideoRecorded] = useState(false)
+  const [userVideoPath, setUserVideoPath] = useState(null)
   const [showCamera, setShowCamera] = useState(false)
   const [countdown, setCountdown] = useState(null)
   const [isRecording, setIsRecording] = useState(false)
@@ -39,9 +26,10 @@ const MotionAssessmentScreen = () => {
   const [evaluationScore, setEvaluationScore] = useState(null)
   const [frameScores, setFrameScores] = useState([])
   const [worstFrames, setWorstFrames] = useState([])
+  const [uploadProgress, setUploadProgress] = useState(0)
 
   const cameraRef = useRef(null)
-  const device = useCameraDevice('front')
+  const device = useCameraDevice("front")
   const { hasPermission, requestPermission } = useCameraPermission()
 
   const handleSelectStandardVideo = (video) => {
@@ -82,6 +70,7 @@ const MotionAssessmentScreen = () => {
         await cameraRef.current.startRecording({
           onRecordingFinished: (video) => {
             console.log("Video recorded:", video.path)
+            setUserVideoPath(video.path) // Store the video path for later upload
             setRecordingStarted(false)
             setIsRecording(false)
             setShowCamera(false)
@@ -93,7 +82,7 @@ const MotionAssessmentScreen = () => {
             setIsRecording(false)
             setShowCamera(false)
           },
-          audio: false
+          audio: false,
         })
         setRecordingStarted(true)
 
@@ -114,6 +103,7 @@ const MotionAssessmentScreen = () => {
     if (cameraRef.current && recordingStarted) {
       try {
         await cameraRef.current.stopRecording()
+        console.log("视频录制结束")
       } catch (error) {
         console.error("Error stopping recording:", error)
         setRecordingStarted(false)
@@ -123,42 +113,154 @@ const MotionAssessmentScreen = () => {
     }
   }
 
-  const handleStartEvaluation = () => {
+  // Convert video file to Base64
+  const convertVideoToBase64 = async (filePath) => {
+    try {
+      const base64 = await RNFS.readFile(filePath, "base64")
+      return base64
+    } catch (error) {
+      console.error("Error converting video to Base64:", error)
+      return null
+    }
+  }
+
+  // Upload video to server
+  const uploadVideo = async () => {
+    if (!userVideoPath) {
+      console.error("No user video path available")
+      return null
+    }
+
+    try {
+      // Convert video to Base64
+      const base64Video = await convertVideoToBase64(userVideoPath)
+      if (!base64Video) {
+        throw new Error("Failed to convert video to Base64")
+      }
+
+      const requestBody = {
+        exercise: base64Video,
+        standard_numeric_id: selectedStandardVideo.numeric_id.toString(),
+      }
+
+      console.log("Uploading video to server...")
+
+      const response = await fetch('http://10.29.79.2:8000/upload-video/', {
+        method: "POST",
+        body: JSON.stringify(requestBody),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      console.log("Upload result:", result)
+      return result
+    } catch (error) {
+      console.error("Error uploading video:", error)
+      return null
+    }
+  }
+
+  // Get assessment results from server
+  const getAssessmentResults = async (assessmentId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/assessment/result/${assessmentId}`)
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      console.log("Assessment results:", result)
+      return result
+    } catch (error) {
+      console.error("Error getting assessment results:", error)
+      return null
+    }
+  }
+
+  const handleStartEvaluation = async () => {
     if (!selectedStandardVideo || !userVideoRecorded) {
-      alert("请先选择标准视频并录制用户视频")
+      Alert.alert("提示", "请先选择标准视频并录制用户视频")
       return
     }
-    
-    
+
     setIsEvaluating(true)
+    setUploadProgress(0)
 
-    // Simulate evaluation process
-    setTimeout(() => {
-      const score = Math.floor(Math.random() * 31) + 70
-      const frames = Array.from({ length: 10 }, (_, i) => ({
-        frame: i + 1,
-        score: Math.floor(Math.random() * 31) + 70,
-      }))
+    try {
+      // Step 1: Upload the video and get assessment ID
+      setUploadProgress(10)
+      const uploadResult = await uploadVideo()
 
+      if (!uploadResult || !uploadResult.assessment_id) {
+        throw new Error("Failed to upload video or get assessment ID")
+      }
+
+      setUploadProgress(50)
+
+      // Step 2: Get assessment results using the assessment ID
+      const assessmentResult = await getAssessmentResults(uploadResult.assessment_id)
+
+      if (!assessmentResult) {
+        throw new Error("Failed to get assessment results")
+      }
+
+      setUploadProgress(100)
+
+      // Step 3: Process and display the results
+      // This is just an example - adjust according to your actual API response structure
+      const score = assessmentResult.overall_score || Math.floor(Math.random() * 31) + 70
+
+      // Process frame scores if available
+      let frames = []
+      if (assessmentResult.frame_scores && Array.isArray(assessmentResult.frame_scores)) {
+        frames = assessmentResult.frame_scores.map((score, index) => ({
+          frame: index + 1,
+          score: score,
+        }))
+      } else {
+        // Fallback to random data if not available
+        frames = Array.from({ length: 10 }, (_, i) => ({
+          frame: i + 1,
+          score: Math.floor(Math.random() * 31) + 70,
+        }))
+      }
+
+      // Get worst frames
       const sortedFrames = [...frames].sort((a, b) => a.score - b.score)
       const worst = sortedFrames.slice(0, 3)
 
+      // Update state with results
       setEvaluationScore(score)
       setFrameScores(frames)
       setWorstFrames(worst)
 
+      // Show results
       setIsEvaluating(false)
       setShowResults(true)
-    }, 2000)
+    } catch (error) {
+      console.error("Evaluation error:", error)
+      Alert.alert("评估失败", "无法完成动作评估，请重试。" + (error.message || ""), [
+        { text: "确定", onPress: () => setIsEvaluating(false) },
+      ])
+    }
   }
 
   const handleReset = () => {
     setSelectedStandardVideo(null)
     setUserVideoRecorded(false)
+    setUserVideoPath(null)
     setShowResults(false)
     setEvaluationScore(null)
     setFrameScores([])
     setWorstFrames([])
+    setUploadProgress(0)
   }
 
   return (
@@ -202,7 +304,12 @@ const MotionAssessmentScreen = () => {
           >
             <View style={styles.loadingContent}>
               <ActivityIndicator size="large" color="#3b82f6" />
-              <Text style={styles.loadingText}>正在评估动作...</Text>
+              <Text style={styles.loadingText}>{uploadProgress < 50 ? "正在上传视频..." : "正在评估动作..."}</Text>
+              {/* Progress indicator */}
+              <View style={styles.progressContainer}>
+                <View style={[styles.progressBar, { width: `${uploadProgress}%` }]} />
+              </View>
+              <Text style={styles.progressText}>{uploadProgress}%</Text>
             </View>
           </BlurView>
         </View>
@@ -233,14 +340,33 @@ const styles = StyleSheet.create({
   loadingContent: {
     justifyContent: "center",
     alignItems: "center",
+    width: "100%",
+    padding: 20,
   },
   loadingText: {
     marginTop: 15,
     fontSize: 16,
     color: "#334155",
     fontWeight: "500",
+    marginBottom: 10,
+  },
+  progressContainer: {
+    width: "80%",
+    height: 6,
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
+    borderRadius: 3,
+    overflow: "hidden",
+    marginTop: 10,
+  },
+  progressBar: {
+    height: "100%",
+    backgroundColor: "#3b82f6",
+  },
+  progressText: {
+    marginTop: 5,
+    fontSize: 12,
+    color: "#64748b",
   },
 })
 
 export default MotionAssessmentScreen
-

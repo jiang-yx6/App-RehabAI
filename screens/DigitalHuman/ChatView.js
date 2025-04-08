@@ -1,4 +1,4 @@
-import React, { useState,  useRef } from 'react';
+import React, { useState,  useRef, useEffect } from 'react';
 import {
     StyleSheet,
     View,
@@ -15,7 +15,7 @@ import { PermissionsAndroid } from "react-native"
 import Icon from "react-native-vector-icons/Ionicons"
 const { height } = Dimensions.get("window")
 
-const ChatView = ({sessionId, isConnected, clickConnection}) => {
+const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
     const [input, setInput] = useState("") // 输入框内容
     const [messages, setMessages] = useState([]) // 聊天内容
     const [isRecording, setIsRecording] = useState(false) // 是否正在录音
@@ -24,6 +24,21 @@ const ChatView = ({sessionId, isConnected, clickConnection}) => {
 
     const scrollViewRef = useRef() // 滚动视图
     const animation = useRef(null) // 动画
+    useEffect(() => {
+      if (audioStream) {
+        console.log("Audio stream available in ChatView")
+        
+        // You can create an audio element for web if needed
+        if (Platform.OS === "web") {
+          const audioElement = new Audio()
+          audioElement.srcObject = audioStream
+          audioElement.play().catch(e => console.error("Error playing audio:", e))
+        }
+        
+        // For native platforms, the audio should play automatically
+        // through the RTCPeerConnection
+      }
+    }, [audioStream])
 
     const requestMicrophonePermission = async () => {
       try {
@@ -53,21 +68,28 @@ const ChatView = ({sessionId, isConnected, clickConnection}) => {
       setMessages([...messages, userMessage])
       setInput("")
       setIsLoading(true)
-      
-      // 发送消息到服务器
-      const response = await fetch('http://10.3.242.26:8020/human', {
-        method:'POST',
-        headers:{
+
+      const response = await fetch('http://10.3.242.26:8010/human', {
+        body: JSON.stringify({
+          text: input.trim(),
+          type: 'echo',
+          interrupt: true,
+          sessionid: sessionId
+        }),
+        headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-            text: userMessage.trim(),
-            type: 'echo',
-            interrupt: true,
-            sessionId: sessionId
-        })
+        method: 'POST'
       });
 
+      // if(!response.ok){
+      // console.error('网络请求失败:', response.status, response.statusText);
+      //     setIsLoading(false);
+      //     return;
+      // }
+
+      // const data = await response.json();
+      console.log('AI响应');
       // Simulate AI response
       setTimeout(async () => {
         const aiResponse = {
@@ -76,11 +98,8 @@ const ChatView = ({sessionId, isConnected, clickConnection}) => {
           isUser: false,
         }
         setMessages((prev) => [...prev, aiResponse])
-        
-        
-
         setIsLoading(false)
-      }, 1500)
+      }, 1000)
     }
   
     const handleVoiceInput = async () => {
@@ -232,7 +251,7 @@ const styles = StyleSheet.create({
         backgroundColor: "white",
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
-        shadowColor: "red",
+        shadowColor: "white",
         shadowOffset: {
             width: 0,
             height: -2,
@@ -240,6 +259,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.5,
         shadowRadius: 3,
         elevation: 3,
+        opacity: 0.6,
     },
     connectionContainer: {
         flex: 1,
@@ -263,6 +283,7 @@ const styles = StyleSheet.create({
         
     chatContainerExpanded: {
         maxHeight: "80%",
+        opacity: 0.7,
     },
     expandButton: {
         alignSelf: 'center',
@@ -327,6 +348,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 2,
         elevation: 2,
+        opacity: 0.95,
     },
     input: {
         flex: 1,

@@ -19,27 +19,6 @@ import VideoPlayer from "./VideoPlayer"
 
 const { width, height } = Dimensions.get("window")
 
-// Mock data for standard videos
-const standardVideos = [
-  {
-    id: "1",
-    title: "肩部康复动作",
-    thumbnail: require("../../assets/shoulder.png"),
-    description: "适用于肩周炎和肩部术后康复",
-  },
-  {
-    id: "2",
-    title: "膝盖康复动作",
-    thumbnail: require("../../assets/knee.png"),
-    description: "适用于膝关节损伤和术后康复",
-  },
-  {
-    id: "3",
-    title: "腰部康复动作",
-    thumbnail: require("../../assets/back.png"),
-    description: "适用于腰椎间盘突出和腰肌劳损",
-  },
-]
 const baseURL = "https://yfvideo.hf.free4inno.com/"
 
 

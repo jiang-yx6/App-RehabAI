@@ -1,283 +1,334 @@
 "use client"
 
-import React, { useRef, useState, useEffect } from "react"
-import {
-	StyleSheet,
-	View,
-	PermissionsAndroid,
-	Platform,
-} from "react-native"
-import {
-	RTCPeerConnection,
-	mediaDevices
-} from 'react-native-webrtc';
-import ChatView from './DigitalHuman/ChatView'
-
-import {DigitView} from './DigitalHuman/DigitView'
+import { useRef, useState, useEffect } from "react"
+import { StyleSheet, View, PermissionsAndroid, Platform } from "react-native"
+import { RTCPeerConnection, mediaDevices, RTCSessionDescription, MediaStream, RTCAudioSession } from "react-native-webrtc"
+import ChatView from "./DigitalHuman/ChatView"
+import { DigitView } from "./DigitalHuman/DigitView"
 
 const DigitalHumanScreen = () => {
-	const [isConnected, setIsConnected] = useState(false)
-	const [sessionId, setSessionId] = useState(null)
-    const [localStream, setLocalStream] = useState(null)
-	const [remoteStream, setRemoteStream] = useState(null)
-	const pcRef = useRef(null)
-	const videoRef = useRef(null)
+  const [isConnected, setIsConnected] = useState(false)
+  const [sessionId, setSessionId] = useState(null)
+  const [localStream, setLocalStream] = useState(null)
+  // Separate streams for audio and video
+  const [remoteVideoStream, setRemoteVideoStream] = useState(null)
+  const [remoteAudioStream, setRemoteAudioStream] = useState(null)
+  const pcRef = useRef(null)
+  const videoRef = useRef(null)
+  const audioRef = useRef(null)
 
-	const mediaConstraints = {
-		audio: true,
-		video: {
-			frameRate: 30,
-			facingMode: 'user'
-		}
-	}
-    // 会话约束
-    const sessionConstraints = {
-        mandatory: {
-            OfferToReceiveAudio: true,
-            OfferToReceiveVideo: true,
-            VoiceActivityDetection: true
-        }
-    };
-	const requestPermissions = async () => {
-		if (Platform.OS === 'android') {
-            try {
-                const granted = await PermissionsAndroid.requestMultiple([
-                    PermissionsAndroid.PERMISSIONS.CAMERA,
-                    PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-                ]);
-                return Object.values(granted).every(
-                    permission => permission === PermissionsAndroid.RESULTS.GRANTED
-                );
-            } catch (err) {
-                console.warn('权限请求失败:', err);
-                return false;
-            }
-        }
-        return true;
-	};
+  const mediaConstraints = {
+    audio: true,
+    video: {
+      frameRate: 30,
+      facingMode: "user",
+    },
+  }
 
-	const getLocalStream = async() => {
-		try{
-			const stream = await mediaDevices.getUserMedia(mediaConstraints)
-			setLocalStream(stream)
-			return stream;
-		}catch(err){
-			console.error('获取本地流失败:', err)
-			throw err;
-		}
-	};
-	
-	const createPeerConnection = () => {
-		const config = {
-			iceServers: [{
-				urls: ['stun:stun.l.google.com:19302']
-			}],
-			sdpSemantics: 'unified-plan'
-		}
+  const sessionConstraints = {
+    mandatory: {
+      OfferToReceiveAudio: true,
+      OfferToReceiveVideo: true,
+      VoiceActivityDetection: true,
+    },
+  }
 
-		const pc = new RTCPeerConnection(config);
+  // Handle remote audio stream changes
+  useEffect(() => {
+    if (remoteAudioStream) {
+      console.log("Remote audio stream set")
 
-		pc.onicecandidate = ({candidate}) => {
-			if(candidate){
-				console.log('收到ICE候选者:', candidate);
-			}
-		}
+      // Enable audio tracks
+      const audioTracks = remoteAudioStream.getAudioTracks()
+      console.log(`Remote audio stream has ${audioTracks.length} audio tracks`)
 
-		pc.ontrack = (event) => {
-            console.log('收到远程轨道:', event.track.kind);
-            if (event.streams && event.streams[0]) {
-                setRemoteStream(event.streams[0]);
-            }
-        };
+      audioTracks.forEach((track) => {
+        console.log(`Enabling audio track: ${track.id}`)
+        track.enabled = true
 
-        pc.onconnectionstatechange = () => {
-            console.log('连接状态变化:', pc.connectionState);
-            if (pc.connectionState === 'connected') {
-                setIsConnected(true);
-            } else if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
-                setIsConnected(false);
-            }
-        };
+        // Add event listeners to track audio state
+        track.onended = () => console.log(`Audio track ${track.id} ended`)
+        track.onmute = () => console.log(`Audio track ${track.id} muted`)
+        track.onunmute = () => console.log(`Audio track ${track.id} unmuted`)
+      })
 
-		return pc;
-	}
-    const negotiate = async(peerConnection) => {
-        try{
-            console.log('开始协商过程...');
-            // peerConnection.addTransceiver('video', { direction: 'recvonly' });
-            // peerConnection.addTransceiver('audio', { direction: 'recvonly' });
-            console.log('已添加音视频接收器');
-
-            const offer = await peerConnection.createOffer(sessionConstraints);
-            await peerConnection.setLocalDescription(offer);
-            console.log('本地描述符已设置:', offer);
-
-            // 等待 ICE gathering 完成
-            await new Promise((resolve) => {
-                if (peerConnection.iceGatheringState === 'complete') {
-                    console.log('ICE收集已完成');
-                    resolve();
-                } else {
-                    console.log('等待ICE收集...');
-                    const checkState = () => {
-                        if (peerConnection.iceGatheringState === 'complete') {
-                            console.log('ICE收集完成');
-                            peerConnection.removeEventListener('icegatheringstatechange', checkState);
-                            resolve();
-                        }
-                    };
-                    peerConnection.addEventListener('icegatheringstatechange', checkState);
-                }
-            });
-
-            console.log('正在发送offer到服务器...');
-            const response = await fetch('http://10.3.242.26:8020/offer', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    sdp: peerConnection.localDescription.sdp,
-                    type: peerConnection.localDescription.type,
-                })
-            });
-
-            const answer = await response.json();
-            console.log('收到服务器应答:', answer);
-            // 从响应中获取 sessionId
-            const { sessionid: newSessionId } = answer;
-            if (newSessionId) {
-                setSessionId(newSessionId);
-                console.log('设置新的 sessionId:', newSessionId);
-            } else {
-                console.warn('未能从服务器响应中获取 sessionId');
-            }
-            await peerConnection.setRemoteDescription(answer);
-            console.log('远程描述符设置完成，连接建立成功！');
-        } catch (error) {
-            console.error('协商失败:', error);
-            throw error;
-        }
-    }
-
-    const handleConnenction = async () => {
+      // Force audio routing to speaker on Android
+      if (Platform.OS === "android") {
         try {
-            console.log('开始建立连接...');
-
-			const hasPermissions = await requestPermissions();
-			if (!hasPermissions) {
-				console.log('权限请求失败');
-				return;
-			}else{
-				console.log('权限请求成功');
-			}
-			
-			const stream = await getLocalStream();
-			const pc = createPeerConnection();
-
-			stream.getTracks().forEach(track => {
-                pc.addTrack(track, stream);
-            });
-
-			pcRef.current = pc;
-            await negotiate(pc);
-
-            // const config = {
-            //     sdpSemantics: 'unified-plan'
-            // };
-        
-            // console.log('使用STUN服务器');
-            // config.iceServers = [{ urls: ['stun:stun.l.google.com:19302'] }];
-        
-            // 创建RTCPeerConnection
-            // const newPc = new RTCPeerConnection(config);
-            // console.log('RTCPeerConnection 已创建');
-
-            // newPc.addEventListener('track', evt => {
-            //     if (evt.track.kind === 'video' && videoRef.current) {
-            //         console.log('收到视频轨道:', evt.track.id);
-            //         videoRef.current.srcObject = evt.streams[0];
-            //     } else if (evt.track.kind === 'audio') {
-            //         console.log('收到音频轨道:', evt.track.id);
-            //         // 获取audio元素
-            //         const audioElement = document.getElementById('audio');
-            //         if (audioElement) {
-            //             audioElement.srcObject = evt.streams[0];
-            //         }
-            //     }
-            // });
-
-            // // 添加连接状态变化监听
-            // newPc.addEventListener('connectionstatechange', () => {
-            //     console.log('连接状态变化:', newPc.connectionState);
-            // });
-
-            // // 添加ICE连接状态变化监听
-            // newPc.addEventListener('iceconnectionstatechange', () => {
-            //     console.log('ICE连接状态:', newPc.iceConnectionState);
-            // });
-
-            // // 添加信令状态变化监听
-            // newPc.addEventListener('signalingstatechange', () => {
-            //     console.log('信令状态:', newPc.signalingState);
-            // });
-
-            // pcRef.current = newPc;
-            // setIsConnected(true);
-            // console.log('开始进行连接协商...');
-
-            // await negotiate(newPc);
-            // console.log('连接建立完成！');
+          const AudioManager = require("react-native").NativeModules.AudioManager
+          if (AudioManager && AudioManager.setSpeakerphoneOn) {
+            console.log("Setting speakerphone on")
+            AudioManager.setSpeakerphoneOn(true)
+          } else {
+            console.warn("AudioManager not available for speaker control")
+          }
         } catch (error) {
-            console.error('连接失败:', error);
-            handleDisconnect();
-            // setMessagesList(prev => [...prev, {
-            //     text: `连接失败: ${error.message || '网络错误'}`,
-            //     type: 'system'
-            // }]);
+          console.error("Error setting audio mode:", error)
         }
+      }
+    }
+  }, [remoteAudioStream])
+
+  // Handle remote video stream changes
+  useEffect(() => {
+    if (remoteVideoStream) {
+      console.log("Remote video stream set")
+      const videoTracks = remoteVideoStream.getVideoTracks()
+      console.log(`Remote video stream has ${videoTracks.length} video tracks`)
+
+      videoTracks.forEach((track) => {
+        console.log(`Enabling video track: ${track.id}`)
+        track.enabled = true
+      })
+    }
+  }, [remoteVideoStream])
+
+  // Configure audio session
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      const audioSession = RTCAudioSession.sharedInstance()
+      audioSession.setCategory('playAndRecord')
+      audioSession.setMode('videoChat')
+      audioSession.setActive(true)
+    }
+    
+    return () => {
+      if (Platform.OS === 'ios') {
+        const audioSession = RTCAudioSession.sharedInstance()
+        audioSession.setActive(false)
+      }
+    }
+  }, [])
+
+  const requestPermissions = async () => {
+    if (Platform.OS === "android") {
+      try {
+        const granted = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        ])
+        return Object.values(granted).every((permission) => permission === PermissionsAndroid.RESULTS.GRANTED)
+      } catch (err) {
+        console.warn("权限请求失败:", err)
+        return false
+      }
+    }
+    return true
+  }
+
+  const getLocalStream = async () => {
+    try {
+      const stream = await mediaDevices.getUserMedia(mediaConstraints)
+      setLocalStream(stream)
+      return stream
+    } catch (err) {
+      console.error("获取本地流失败:", err)
+      throw err
+    }
+  }
+
+  const createPeerConnection = () => {
+    const config = {
+      iceServers: [
+        {
+          urls: ["stun:stun.l.google.com:19302"],
+        },
+      ],
+      sdpSemantics: "unified-plan",
     }
 
-	const handleDisconnect = () => {
-        if (localStream) {
-            localStream.getTracks().forEach(track => track.stop());
-            setLocalStream(null);
-        }
-        if (remoteStream) {
-            remoteStream.getTracks().forEach(track => track.stop());
-            setRemoteStream(null);
-        }
-        if (pcRef.current) {
-            pcRef.current.close();
-            pcRef.current = null;
-        }
-        setIsConnected(false);
-        setSessionId(null);
-    };
+    const pc = new RTCPeerConnection(config)
 
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate) {
+        console.log("收到ICE候选者:", candidate)
+      }
+    }
 
-	return (
-		<View style={styles.container}>
-			<DigitView
-				 videoRef={videoRef}
-				 isConnected={isConnected}
-				 remoteStream={remoteStream}
-			/>
-			<ChatView 
-				sessionId={sessionId} 
-				isConnected={isConnected}
-				clickConnection={handleConnenction}
-			/>
-		</View>
-	)
+    pc.ontrack = (event) => {
+      console.log("收到远程轨道:", event.track.kind)
+    
+      // Create separate streams for audio and video
+      if (event.track.kind === "audio") {
+        // Create new audio stream if it doesn't exist
+        const audioStream = remoteAudioStream || new MediaStream()
+        
+        // Check if we already have this track
+        const existingTracks = audioStream.getAudioTracks()
+        const trackExists = existingTracks.some(t => t.id === event.track.id)
+        
+        if (!trackExists) {
+          console.log(`Adding audio track ${event.track.id} to audio stream`)
+          audioStream.addTrack(event.track)
+          setRemoteAudioStream(audioStream)
+        }
+      } else if (event.track.kind === "video") {
+        // Create new video stream if it doesn't exist
+        const videoStream = remoteVideoStream || new MediaStream()
+        
+        // Check if we already have this track
+        const existingTracks = videoStream.getVideoTracks()
+        const trackExists = existingTracks.some(t => t.id === event.track.id)
+        
+        if (!trackExists) {
+          console.log(`Adding video track ${event.track.id} to video stream`)
+          videoStream.addTrack(event.track)
+          setRemoteVideoStream(videoStream)
+        }
+      }
+    }
+
+    pc.onconnectionstatechange = () => {
+      console.log("连接状态变化:", pc.connectionState)
+      if (pc.connectionState === "connected") {
+        setIsConnected(true)
+      } else if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
+        setIsConnected(false)
+      }
+    }
+
+    return pc
+  }
+
+  const negotiate = async (peerConnection) => {
+    try {
+      console.log("开始协商过程...")
+
+      // Explicitly add transceivers for audio and video
+      peerConnection.addTransceiver("video", { direction: "recvonly" })
+      peerConnection.addTransceiver("audio", { direction: "recvonly" })
+      console.log("已添加音视频接收器")
+
+      const offer = await peerConnection.createOffer(sessionConstraints)
+      await peerConnection.setLocalDescription(offer)
+      console.log("本地描述符已设置:", offer)
+
+      // 等待 ICE gathering 完成
+      await new Promise((resolve) => {
+        if (peerConnection.iceGatheringState === "complete") {
+          console.log("ICE收集已完成")
+          resolve()
+        } else {
+          console.log("等待ICE收集...")
+          const checkState = () => {
+            if (peerConnection.iceGatheringState === "complete") {
+              console.log("ICE收集完成")
+              peerConnection.removeEventListener("icegatheringstatechange", checkState)
+              resolve()
+            }
+          }
+          peerConnection.addEventListener("icegatheringstatechange", checkState)
+        }
+      })
+
+      console.log("正在发送offer到服务器...")
+      const response = await fetch("http://10.3.242.26:8010/offer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sdp: peerConnection.localDescription.sdp,
+          type: peerConnection.localDescription.type,
+        }),
+      })
+
+      const answer = await response.json()
+      console.log("收到服务器应答:", answer)
+      // 从响应中获取 sessionId
+      const { sessionid: newSessionId } = answer
+      if (newSessionId) {
+        setSessionId(newSessionId)
+        console.log("设置新的 sessionId:", newSessionId)
+      } else {
+        console.warn("未能从服务器响应中获取 sessionId")
+      }
+
+      // Set remote description
+      const remoteDesc = new RTCSessionDescription(answer)
+      await peerConnection.setRemoteDescription(remoteDesc)
+      console.log("远程描述符设置完成，连接建立成功！")
+    } catch (error) {
+      console.error("协商失败:", error)
+      throw error
+    }
+  }
+
+  const handleConnenction = async () => {
+    try {
+      console.log("开始建立连接...")
+
+      const hasPermissions = await requestPermissions()
+      if (!hasPermissions) {
+        console.log("权限请求失败")
+        return
+      } else {
+        console.log("权限请求成功")
+      }
+
+      const stream = await getLocalStream()
+      const pc = createPeerConnection()
+
+      stream.getTracks().forEach((track) => {
+        pc.addTrack(track, stream)
+      })
+
+      pcRef.current = pc
+      await negotiate(pc)
+    } catch (error) {
+      console.error("连接失败:", error)
+      handleDisconnect()
+    }
+  }
+
+  const handleDisconnect = () => {
+    if (localStream) {
+      localStream.getTracks().forEach((track) => track.stop())
+      setLocalStream(null)
+    }
+    
+    // Clean up both streams
+    if (remoteAudioStream) {
+      remoteAudioStream.getTracks().forEach((track) => track.stop())
+      setRemoteAudioStream(null)
+    }
+    
+    if (remoteVideoStream) {
+      remoteVideoStream.getTracks().forEach((track) => track.stop())
+      setRemoteVideoStream(null)
+    }
+    
+    if (pcRef.current) {
+      pcRef.current.close()
+      pcRef.current = null
+    }
+    
+    setIsConnected(false)
+    setSessionId(null)
+  }
+
+  return (
+    <View style={styles.container}>
+      <DigitView 
+        videoRef={videoRef} 
+        isConnected={isConnected} 
+        remoteStream={remoteVideoStream} 
+      />
+      <ChatView 
+        sessionId={sessionId} 
+        isConnected={isConnected} 
+        clickConnection={handleConnenction} 
+        audioStream={remoteAudioStream}
+      />
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: '#fff'
-	}
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
 })
 
 export default DigitalHumanScreen
-

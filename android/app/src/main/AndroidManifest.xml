@@ -26,6 +26,9 @@
     <!-- 唤醒锁定权限（保持屏幕常亮） -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     
+    
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <!-- ... 其他权限 ... -->
     <application
       android:name=".MainApplication"

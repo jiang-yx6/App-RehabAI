@@ -1,52 +1,48 @@
-import React from "react"
-import {
-    StyleSheet,
-    View,
-    Dimensions,
-    Image,
-} from "react-native"
-import { RTCView } from 'react-native-webrtc';
-import { BlurView } from "@react-native-community/blur";
+import { StyleSheet, View, Dimensions, Image } from "react-native"
+import { RTCView } from "react-native-webrtc"
+import { BlurView } from "@react-native-community/blur"
 
 const { width } = Dimensions.get("window")
 const { height } = Dimensions.get("window")
 
 export const DigitView = ({ videoRef, isConnected, remoteStream }) => {
-    return (
-        <View style={styles.digitalHumanContainer}>
-            <BlurView style={styles.blurView} blurType="light" blurAmount={5} reducedTransparencyFallbackColor="white">
-                    {/* 可以在这里添加占位图片或加载动画 */}
-                    {isConnected && remoteStream ? (
-                        <RTCView 
-                        ref={videoRef}
-                        streamURL={remoteStream.toURL()}
-                        objectFit="cover"
-                        style={styles.digitalHuman} />
-                    ) : (
-                        <Image source={require('../../assets/doctor.jpg')} style={styles.digitalHuman} />
-                    )}
-            </BlurView>
-        </View>
-    )
+  return (
+    <View style={styles.digitalHumanContainer}>
+      <BlurView style={styles.blurView} blurType="light" blurAmount={5} reducedTransparencyFallbackColor="white">
+        {isConnected && remoteStream ? (
+          <RTCView
+            ref={videoRef}
+            streamURL={remoteStream.toURL()}
+            objectFit="cover"
+            style={styles.digitalHuman}
+            zOrder={0}
+            mirror={false}
+          />
+        ) : (
+          <Image source={require("../../assets/doctor.jpg")} style={styles.digitalHuman} />
+        )}
+      </BlurView>
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
-    digitalHumanContainer: {
-        height: "90%",
-        width: "100%",
-        justifyContent: "center",
-        alignItems: "center",
-        overflow: "hidden",
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
-    },
-    blurView: {
-        width: "100%",
-        height: "100%",
-        overflow: "hidden",
-    },
-    digitalHuman: {
-        width: width,
-        height: height * 0.8,
-    },
+  digitalHumanContainer: {
+    height: "90%",
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  blurView: {
+    width: "100%",
+    height: "100%",
+    overflow: "hidden",
+  },
+  digitalHuman: {
+    width: width,
+    height: height * 0.8,
+  },
 })
