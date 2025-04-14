@@ -21,6 +21,12 @@ const HomeScreen = ({ navigation }) => {
                 <Text style={styles.buttonText}>动作评估</Text>
               </View>
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Recorder")}>
+              <View style={styles.buttonInner}>
+                <Text style={styles.buttonText}>语音Test</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
       </BlurView>

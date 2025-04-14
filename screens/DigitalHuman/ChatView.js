@@ -11,6 +11,7 @@ import {
     Animated,
 } from "react-native"
 import AudioRecord from "react-native-audio-record"
+import Microphone from './Microphone';
 import { PermissionsAndroid } from "react-native"
 import Icon from "react-native-vector-icons/Ionicons"
 const { height } = Dimensions.get("window")
@@ -21,9 +22,12 @@ const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
     const [isRecording, setIsRecording] = useState(false) // 是否正在录音
     const [isLoading, setIsLoading] = useState(false) // 是否正在加载
     const [isExpanded, setIsExpanded] = useState(false) // 聊天内容是否展开
+    const [micStatus, setMicStatus] = useState("")
+    const [showMicStatus, setShowMicStatus] = useState(false)
+    const statusOpacity = useRef(new Animated.Value(0)).current
 
     const scrollViewRef = useRef() // 滚动视图
-    const animation = useRef(null) // 动画
+    // const animation = useRef(null) // 动画
     useEffect(() => {
       if (audioStream) {
         console.log("Audio stream available in ChatView")
@@ -72,7 +76,7 @@ const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
       const response = await fetch('http://10.3.242.26:8010/human', {
         body: JSON.stringify({
           text: input.trim(),
-          type: 'echo',
+          type: 'chat',
           interrupt: true,
           sessionid: sessionId
         }),
@@ -81,7 +85,21 @@ const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
         },
         method: 'POST'
       });
+    
 
+    const data = await response.json();
+    if(data.llm_response){
+        console.log('AI响应');
+        // setTimeout(async () => {
+            const aiResponse = {
+                id: Date.now() + 1,
+                text: data.llm_response,
+                isUser: false,
+            }
+            setMessages((prev) => [...prev, aiResponse])
+            setIsLoading(false)
+        // }, 1000)
+      }
       // if(!response.ok){
       // console.error('网络请求失败:', response.status, response.statusText);
       //     setIsLoading(false);
@@ -89,76 +107,70 @@ const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
       // }
 
       // const data = await response.json();
-      console.log('AI响应');
       // Simulate AI response
-      setTimeout(async () => {
-        const aiResponse = {
-          id: Date.now() + 1,
-          text: generateResponse(input),
-          isUser: false,
-        }
-        setMessages((prev) => [...prev, aiResponse])
-        setIsLoading(false)
-      }, 1000)
+      
     }
   
-    const handleVoiceInput = async () => {
-      try {
-        if (isRecording) {
-          // Stop recording
-          setIsRecording(false)
-          animation.current?.pause()
-          AudioRecord.stop()
-  
-          // Simulate processing voice and getting text
-          setTimeout(() => {
-            const voiceText = "这是语音输入的模拟文本"
-            const userMessage = {
-              id: Date.now(),
-              text: voiceText,
-              isUser: true,
-            }
-  
-            setMessages([...messages, userMessage])
-            setIsLoading(true)
-  
-            // Simulate AI response
-            setTimeout(() => {
-              const aiResponse = {
-                id: Date.now() + 1,
-                text: generateResponse(voiceText),
-                isUser: false,
-              }
-              setMessages((prev) => [...prev, aiResponse])
-              setIsLoading(false)
-            }, 1500)
-          }, 1000)
-        } else {
-          // Start recording
-          const hasPermission = await requestMicrophonePermission()
-          if (!hasPermission) {
-            alert("需要麦克风权限来进行语音交互")
-            return
-          }
-  
-          const options = {
-            sampleRate: 16000,
-            channels: 1,
-            bitsPerSample: 16,
-            audioSource: 6,
-            wavFile: "voice_input.wav",
-          }
-  
-          AudioRecord.init(options)
-          AudioRecord.start()
-  
-          setIsRecording(true)
-          animation.current?.play()
-        }
-      } catch (error) {
-        console.error("Error with voice recording:", error)
-      }
+    const handleVoiceInput = (result) =>{
+      setInput(result);
     }
+    // const handleVoiceInput = async () => {
+    //   try {
+    //     if (isRecording) {
+    //       // Stop recording
+    //       setIsRecording(false)
+    //       animation.current?.pause()
+    //       AudioRecord.stop()
+  
+    //       // Simulate processing voice and getting text
+    //       setTimeout(() => {
+    //         const voiceText = "这是语音输入的模拟文本"
+    //         const userMessage = {
+    //           id: Date.now(),
+    //           text: voiceText,
+    //           isUser: true,
+    //         }
+  
+    //         setMessages([...messages, userMessage])
+    //         setIsLoading(true)
+  
+    //         // Simulate AI response
+    //         setTimeout(() => {
+    //           const aiResponse = {
+    //             id: Date.now() + 1,
+    //             text: generateResponse(voiceText),
+    //             isUser: false,
+    //           }
+    //           setMessages((prev) => [...prev, aiResponse])
+    //           setIsLoading(false)
+    //         }, 1500)
+    //       }, 1000)
+    //     } else {
+    //       // Start recording
+    //       const hasPermission = await requestMicrophonePermission()
+    //       if (!hasPermission) {
+    //         alert("需要麦克风权限来进行语音交互")
+    //         return
+    //       }
+  
+    //       const options = {
+    //         sampleRate: 16000,
+    //         channels: 1,
+    //         bitsPerSample: 16,
+    //         audioSource: 6,
+    //         wavFile: "voice_input.wav",
+    //       }
+  
+    //       AudioRecord.init(options)
+    //       AudioRecord.start()
+  
+    //       setIsRecording(true)
+    //       animation.current?.play()
+    //     }
+    //   } catch (error) {
+    //     console.error("Error with voice recording:", error)
+    //   }
+    // }
   
     // Simple response generator (would be replaced with actual AI model)
     const generateResponse = (query) => {
@@ -176,12 +188,36 @@ const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
         setIsExpanded(!isExpanded);
     };
 
+    const showStatusMessage = (status, isLoading) => {
+        setMicStatus(isLoading ? `${status}...` : status)
+        setShowMicStatus(true)
+        
+        // 重置透明度并开始显示动画
+        statusOpacity.setValue(1)
+        
+        // 3秒后开始淡出动画
+        setTimeout(() => {
+            Animated.timing(statusOpacity, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true
+            }).start(() => setShowMicStatus(false))
+        }, 1500)
+    }
+
     return (
       isConnected ? (
         <View style={[
             styles.chatContainer, 
             isExpanded ? styles.chatContainerExpanded : null
         ]}>
+            {showMicStatus && (
+                <Animated.View style={[styles.statusOverlay, { opacity: statusOpacity }]}>
+                    <Text style={styles.statusText}>{micStatus}</Text>
+                    {/* <ActivityIndicator size="small" color="#fff" /> */}
+                </Animated.View>
+            )}
+            
             <TouchableOpacity 
                 style={styles.expandButton} 
                 onPress={toggleExpand}
@@ -221,9 +257,10 @@ const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
                 placeholderTextColor="#a0aec0"
                 multiline
             />
-            <TouchableOpacity style={styles.voiceButton} onPress={handleVoiceInput}>
-                <Icon name={isRecording ? "mic" : "mic-outline"} size={24} color={isRecording ? "#ef4444" : "#3b82f6"} />
-            </TouchableOpacity>
+            <Microphone 
+                handleVoiceInput={handleVoiceInput}
+                onStatusChange={showStatusMessage}
+            />
             <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage} disabled={input.trim() === ""}>
                 <Icon name="send" size={24} color="white" />
             </TouchableOpacity>
@@ -367,6 +404,25 @@ const styles = StyleSheet.create({
         padding: 8,
         justifyContent: "center",
         alignItems: "center",
+    },
+    statusOverlay: {
+        position: 'absolute',
+        top: 10,
+        left: '50%',
+        transform: [{ translateX: -100 }],
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        padding: 10,
+        borderRadius: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        zIndex: 1000,
+        width: 200,
+        justifyContent: 'center',
+    },
+    statusText: {
+        color: '#fff',
+        marginRight: 8,
+        fontSize: 14,
     },
 })
 

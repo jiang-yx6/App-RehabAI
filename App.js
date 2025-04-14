@@ -6,7 +6,7 @@ import { StatusBar ,View,Text} from "react-native"
 import HomeScreen from "./screens/HomeScreen"
 import DigitalHumanScreen from "./screens/DigitalHumanScreen"
 import MotionAssessmentScreen from "./screens/MotionAssessmentScreen"
-
+import RealtimeSpeechRecognition from "./screens/ASR/RealtimeSpeechRecognition"
 const Stack = createStackNavigator()
 
 export default function App() {
@@ -30,6 +30,8 @@ export default function App() {
         <Stack.Screen name="Home" component={HomeScreen} options={{ title: "康复医疗AI系统" }} />
         <Stack.Screen name="DigitalHuman" component={DigitalHumanScreen} options={{ title: "数字人交互" }} />
         <Stack.Screen name="MotionAssessment" component={MotionAssessmentScreen} options={{ title: "动作评估" }} />
+        <Stack.Screen name="Recorder" component={RealtimeSpeechRecognition} options={{ title: "语音Test" }}/>
+        
         </Stack.Navigator>
     </NavigationContainer>
     </>

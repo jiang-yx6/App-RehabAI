@@ -44,5 +44,6 @@ const styles = StyleSheet.create({
   digitalHuman: {
     width: width,
     height: height * 0.8,
+    
   },
 })
