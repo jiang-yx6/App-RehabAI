@@ -100,6 +100,12 @@ const DigitalHumanScreen = () => {
     }
   }, [])
 
+  useEffect(() => {
+    return ()=>{
+      console.log('WebRtc断开ing...')
+      handleDisconnect();
+    }
+  }, [])
   const requestPermissions = async () => {
     if (Platform.OS === "android") {
       try {

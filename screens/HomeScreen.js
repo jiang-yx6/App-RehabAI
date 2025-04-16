@@ -6,7 +6,7 @@ const HomeScreen = ({ navigation }) => {
     <ImageBackground source={require("../assets/background.png")} style={styles.background}>
       <BlurView style={styles.blurContainer} blurType="light" blurAmount={10} reducedTransparencyFallbackColor="white">
         <View style={styles.container}>
-          <Text style={styles.title}>康复医疗AI系统</Text>
+          <Text style={styles.title}>康途向导</Text>
           <Text style={styles.subtitle}>智能辅助您的康复之旅</Text>
 
           <View style={styles.buttonContainer}>
@@ -22,11 +22,11 @@ const HomeScreen = ({ navigation }) => {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Recorder")}>
+            {/* <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Recorder")}>
               <View style={styles.buttonInner}>
                 <Text style={styles.buttonText}>语音Test</Text>
               </View>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
       </BlurView>

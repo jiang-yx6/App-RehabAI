@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 允许所有HTTP连接（不推荐，但最简单） -->
+    <base-config cleartextTrafficPermitted="true" />
+    
+    <!-- 或者，更安全的方式：只允许特定域名的HTTP连接 -->
+    <!--
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">yourserver.com</domain>
+    </domain-config>
+    -->
+</network-security-config>

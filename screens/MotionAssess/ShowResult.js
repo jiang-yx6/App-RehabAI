@@ -1,28 +1,77 @@
-import React from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Dimensions,
-} from "react-native";
-import { LineChart } from "react-native-chart-kit";
+"use client"
 
-const { width } = Dimensions.get("window");
+import { useState, useEffect } from "react"
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Dimensions, Image } from "react-native"
+import { LineChart } from "react-native-chart-kit"
+import HlsVideo from "./HlsVideo"
+const { width } = Dimensions.get("window")
+const API_BASE_URL = "https://yfvideo.hf.free4inno.com"
 
-const ShowResult = ({ 
-  evaluationScore, 
-  frameScores, 
-  worstFrames, 
-  onReset 
-}) => {
+const ShowResult = ({ resultData, onReset }) => {
+  const [evaluationScore, setEvaluationScore] = useState(0)
+  const [frameScores, setFrameScores] = useState({
+    labels: [],
+    datasets: [{ data: [] }],
+  })
+  const [worstFrames, setWorstFrames] = useState([])
+  const [standardVideoHLS, setStandardVideoHLS] = useState("")
+  const [exerciseVideoHLS, setExerciseVideoHLS] = useState("")
+  const [overlapVideoHLS, setOverlapVideoHLS] = useState("")
+  const [videoVisible, setVideoVisible] = useState(false)
+  const [currentVideoHLS, setCurrentVideoHLS] = useState("")
+
+  useEffect(() => {
+    if (resultData) {
+      console.log("resultData:", resultData)
+      // 解析 frame_scores
+      const frameScoresObj = resultData.frame_scores || {}
+
+      const scores = Object.values(frameScoresObj)
+      const totalScore = scores.length > 0 ? scores.reduce((acc, score) => acc + score, 0) : 0
+      const averageScore = scores.length > 0 ? totalScore / scores.length : 0
+      setEvaluationScore(averageScore)
+
+      // 设置 frameScores 用于图表 - 只显示每5个帧的标签和点
+      const frameLabels = Object.keys(frameScoresObj)
+      const frameData = Object.values(frameScoresObj)
+
+      // 创建稀疏标签 - 只保留每5个标签
+      const sparseLabels = frameLabels.map((label, index) => (index % 5 === 0 ? label : ""))
+
+      setFrameScores({
+        labels: sparseLabels,
+        datasets: [{ data: frameData }],
+      })
+
+      // 设置 worstFrames
+      const worstFramesData = resultData.exercise_worst_frames || []
+
+      setWorstFrames(
+        worstFramesData.map((frame, index) => ({
+          frame: index + 1,
+          image: `${API_BASE_URL + frame}`,
+          score: frameScoresObj[frame] || 0,
+        })),
+      )
+
+      // 设置视频流
+      setStandardVideoHLS(`${API_BASE_URL + resultData.standard_video_hls}`)
+      setExerciseVideoHLS(`${API_BASE_URL + resultData.exercise_video_hls}`)
+      setOverlapVideoHLS(`${API_BASE_URL + resultData.overlap_video_hls}`)
+    }
+  }, [resultData])
+
+  const handleVideoPress = (videoHLS) => {
+    setCurrentVideoHLS(videoHLS)
+    setVideoVisible(true)
+  }
+
   return (
     <ScrollView style={styles.resultsContainer} contentContainerStyle={styles.resultsContent}>
       <View style={styles.scoreContainer}>
         <Text style={styles.scoreTitle}>动作评估得分</Text>
         <View style={styles.scoreCircle}>
-          <Text style={styles.scoreValue}>{evaluationScore}</Text>
+          <Text style={styles.scoreValue}>{evaluationScore.toFixed(2)}</Text>
           <Text style={styles.scoreMax}>/100</Text>
         </View>
         <Text style={styles.scoreDescription}>
@@ -32,54 +81,66 @@ const ShowResult = ({
 
       <View style={styles.chartContainer}>
         <Text style={styles.chartTitle}>每帧得分</Text>
-        <ScrollView 
-          horizontal={true} 
+        <ScrollView
+          horizontal={true}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chartScrollContent}
         >
-          <LineChart
-            data={{
-              labels: ["January", "February", "March", "April", "May", "June"],
-              datasets: [
-                {
-                  data: [
-                    Math.random() * 100,
-                    Math.random() * 100,
-                    Math.random() * 100,
-                    Math.random() * 100,
-                    Math.random() * 100,
-                    Math.random() * 100
-                  ]
+          {frameScores.datasets[0].data.length > 0 ? (
+            <LineChart
+              data={frameScores}
+              width={Math.max(width - 40, 20 * 50)}
+              height={220}
+              yAxisLabel=""
+              yAxisSuffix=""
+              yAxisInterval={1}
+              chartConfig={{
+                backgroundColor: "#3b82f6",
+                backgroundGradientFrom: "#fb8c00",
+                backgroundGradientTo: "#ffa726",
+                decimalPlaces: 2,
+                color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                style: {
+                  borderRadius: 16,
+                },
+                propsForDots: {
+                  r: "6",
+                  strokeWidth: "2",
+                  stroke: "#ffa726",
+                },
+              }}
+              bezier
+              style={{
+                marginVertical: 8,
+                borderRadius: 16,
+              }}
+              // 只在每5个点显示点标记
+              renderDotContent={({ x, y, index }) => {
+                if (index % 5 === 0) {
+                  return (
+                    <View
+                      key={index}
+                      style={{
+                        position: "absolute",
+                        top: y - 10,
+                        left: x - 10,
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        backgroundColor: "#ffa726",
+                      }}
+                    />
+                  )
                 }
-              ]
-            }}
-            width={Math.max(width - 40, frameScores.length * 50)}
-            height={220}
-            yAxisLabel="$"
-            yAxisSuffix="k"
-            yAxisInterval={1}
-            chartConfig={{
-              backgroundColor: "#3b82f6",
-              backgroundGradientFrom: "#fb8c00",
-              backgroundGradientTo: "#ffa726",
-              decimalPlaces: 2,
-              color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-              labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-              style: {
-                borderRadius: 16
-              },
-              propsForDots: {
-                r: "6",
-                strokeWidth: "2",
-                stroke: "#ffa726"
-              }
-            }}
-            bezier
-            style={{
-              marginVertical: 8,
-              borderRadius: 16
-            }}
-          />
+                return null
+              }}
+            />
+          ) : (
+            <View style={styles.noDataContainer}>
+              <Text style={styles.noDataText}>No chart data available</Text>
+            </View>
+          )}
         </ScrollView>
       </View>
 
@@ -89,20 +150,36 @@ const ShowResult = ({
           {worstFrames.map((frame, index) => (
             <View key={index} style={styles.worstFrameItem}>
               <View style={styles.worstFrameInfo}>
+                {/* 使用React Native的Image组件而不是SVG的Image */}
+                <Image style={styles.worstImages} source={{ uri: frame.image }} resizeMode="cover" />
                 <Text style={styles.worstFrameNumber}>帧 {frame.frame}</Text>
-                <Text style={styles.worstFrameScore}>得分: {frame.score}</Text>
+                <Text style={styles.worstFrameScore}>得分: {frame.score.toFixed(2)}</Text>
               </View>
             </View>
           ))}
         </View>
       </View>
 
+      <View style={styles.videoButtonsContainer}>
+        <TouchableOpacity style={styles.videoButton} onPress={() => handleVideoPress(standardVideoHLS)}>
+          <Text style={styles.videoButtonText}>标准动作视频</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.videoButton} onPress={() => handleVideoPress(exerciseVideoHLS)}>
+          <Text style={styles.videoButtonText}>练习动作视频</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.videoButton} onPress={() => handleVideoPress(overlapVideoHLS)}>
+          <Text style={styles.videoButtonText}>重叠动作视频</Text>
+        </TouchableOpacity>
+      </View>
+
+      <HlsVideo visible={videoVisible} videoId={currentVideoHLS} onClose={() => setVideoVisible(false)} />
+
       <TouchableOpacity style={styles.resetButton} onPress={onReset}>
         <Text style={styles.resetButtonText}>重新选择</Text>
       </TouchableOpacity>
     </ScrollView>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   resultsContainer: {
@@ -163,10 +240,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    alignItems: 'center',
+    alignItems: "center",
   },
   chartScrollContent: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingHorizontal: 10,
   },
   chartTitle: {
@@ -174,7 +251,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#334155",
     marginBottom: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
   worstFramesContainer: {
     backgroundColor: "white",
@@ -193,6 +270,15 @@ const styles = StyleSheet.create({
     color: "#334155",
     marginBottom: 15,
   },
+
+  worstImages: {
+    width: 100,
+    height: 100,
+    marginBottom: 10,
+    borderRadius: 10,
+    backgroundColor: "#f1f5f9",
+  },
+
   worstFramesGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -214,6 +300,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#64748b",
   },
+  videoButtonsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 20,
+  },
+  videoButton: {
+    backgroundColor: "#3b82f6",
+    borderRadius: 15,
+    padding: 10,
+    alignItems: "center",
+    width: "30%",
+  },
+  videoButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "500",
+  },
   resetButton: {
     backgroundColor: "#f1f5f9",
     borderRadius: 15,
@@ -226,6 +329,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500",
   },
-});
+  noDataContainer: {
+    height: 220,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f1f5f9",
+    borderRadius: 16,
+    marginVertical: 8,
+  },
+  noDataText: {
+    color: "#64748b",
+    fontSize: 16,
+  },
+})
 
-export default ShowResult;
+export default ShowResult

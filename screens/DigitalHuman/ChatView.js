@@ -10,7 +10,6 @@ import {
     Dimensions,
     Animated,
 } from "react-native"
-import AudioRecord from "react-native-audio-record"
 import Microphone from './Microphone';
 import { PermissionsAndroid } from "react-native"
 import Icon from "react-native-vector-icons/Ionicons"
@@ -25,7 +24,7 @@ const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
     const [micStatus, setMicStatus] = useState("")
     const [showMicStatus, setShowMicStatus] = useState(false)
     const statusOpacity = useRef(new Animated.Value(0)).current
-
+    const microphoneRef = useRef(null)
     const scrollViewRef = useRef() // 滚动视图
     // const animation = useRef(null) // 动画
     useEffect(() => {
@@ -42,6 +41,13 @@ const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
         // For native platforms, the audio should play automatically
         // through the RTCPeerConnection
       }
+
+    //   return () =>{
+    //     if(microphoneRef.current){
+    //         console.log("Cleaning up microphone")
+    //         microphoneRef.current.cleanup()
+    //     }
+    //   }
     }, [audioStream])
 
     const requestMicrophonePermission = async () => {
@@ -90,87 +96,20 @@ const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
     const data = await response.json();
     if(data.llm_response){
         console.log('AI响应');
-        // setTimeout(async () => {
-            const aiResponse = {
-                id: Date.now() + 1,
-                text: data.llm_response,
-                isUser: false,
-            }
-            setMessages((prev) => [...prev, aiResponse])
-            setIsLoading(false)
-        // }, 1000)
+        const aiResponse = {
+            id: Date.now() + 1,
+            text: data.llm_response,
+            isUser: false,
+        }
+        setMessages((prev) => [...prev, aiResponse])
+        setIsLoading(false)
       }
-      // if(!response.ok){
-      // console.error('网络请求失败:', response.status, response.statusText);
-      //     setIsLoading(false);
-      //     return;
-      // }
-
-      // const data = await response.json();
-      // Simulate AI response
-      
     }
   
     const handleVoiceInput = (result) =>{
       setInput(result);
+      console.log("result is: ",result);
     }
-    // const handleVoiceInput = async () => {
-    //   try {
-    //     if (isRecording) {
-    //       // Stop recording
-    //       setIsRecording(false)
-    //       animation.current?.pause()
-    //       AudioRecord.stop()
-  
-    //       // Simulate processing voice and getting text
-    //       setTimeout(() => {
-    //         const voiceText = "这是语音输入的模拟文本"
-    //         const userMessage = {
-    //           id: Date.now(),
-    //           text: voiceText,
-    //           isUser: true,
-    //         }
-  
-    //         setMessages([...messages, userMessage])
-    //         setIsLoading(true)
-  
-    //         // Simulate AI response
-    //         setTimeout(() => {
-    //           const aiResponse = {
-    //             id: Date.now() + 1,
-    //             text: generateResponse(voiceText),
-    //             isUser: false,
-    //           }
-    //           setMessages((prev) => [...prev, aiResponse])
-    //           setIsLoading(false)
-    //         }, 1500)
-    //       }, 1000)
-    //     } else {
-    //       // Start recording
-    //       const hasPermission = await requestMicrophonePermission()
-    //       if (!hasPermission) {
-    //         alert("需要麦克风权限来进行语音交互")
-    //         return
-    //       }
-  
-    //       const options = {
-    //         sampleRate: 16000,
-    //         channels: 1,
-    //         bitsPerSample: 16,
-    //         audioSource: 6,
-    //         wavFile: "voice_input.wav",
-    //       }
-  
-    //       AudioRecord.init(options)
-    //       AudioRecord.start()
-  
-    //       setIsRecording(true)
-    //       animation.current?.play()
-    //     }
-    //   } catch (error) {
-    //     console.error("Error with voice recording:", error)
-    //   }
-    // }
   
     // Simple response generator (would be replaced with actual AI model)
     const generateResponse = (query) => {
@@ -258,6 +197,7 @@ const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
                 multiline
             />
             <Microphone 
+                ref ={microphoneRef}
                 handleVoiceInput={handleVoiceInput}
                 onStatusChange={showStatusMessage}
             />

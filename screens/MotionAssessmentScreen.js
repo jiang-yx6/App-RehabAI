@@ -23,9 +23,10 @@ const MotionAssessmentScreen = () => {
   const [recordingStarted, setRecordingStarted] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const [isEvaluating, setIsEvaluating] = useState(false)
-  const [evaluationScore, setEvaluationScore] = useState(null)
-  const [frameScores, setFrameScores] = useState([])
-  const [worstFrames, setWorstFrames] = useState([])
+  // const [evaluationScore, setEvaluationScore] = useState(null)
+  // const [frameScores, setFrameScores] = useState([])
+  // const [worstFrames, setWorstFrames] = useState([])
+  const [resultData, setResultData] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
 
   const cameraRef = useRef(null)
@@ -144,8 +145,9 @@ const MotionAssessmentScreen = () => {
       }
 
       console.log("Uploading video to server...")
-
-      const response = await fetch('http://10.29.79.2:8000/upload-video/', {
+      console.log("exercise:",requestBody.exercise.substring(0,100))
+      console.log("standard_numeric_id:",requestBody.standard_numeric_id)
+      const response = await fetch(`${API_BASE_URL}/upload-video/`, {
         method: "POST",
         body: JSON.stringify(requestBody),
         headers: {
@@ -198,52 +200,31 @@ const MotionAssessmentScreen = () => {
       setUploadProgress(10)
       const uploadResult = await uploadVideo()
 
-      if (!uploadResult || !uploadResult.assessment_id) {
+      if (!uploadResult) {
         throw new Error("Failed to upload video or get assessment ID")
       }
 
       setUploadProgress(50)
 
       // Step 2: Get assessment results using the assessment ID
-      const assessmentResult = await getAssessmentResults(uploadResult.assessment_id)
+      const assessmentResult = uploadResult;
 
       if (!assessmentResult) {
         throw new Error("Failed to get assessment results")
       }
+      setResultData(assessmentResult)
 
       setUploadProgress(100)
 
       // Step 3: Process and display the results
       // This is just an example - adjust according to your actual API response structure
-      const score = assessmentResult.overall_score || Math.floor(Math.random() * 31) + 70
-
+      // const score = assessmentResult.overall_score || Math.floor(Math.random() * 31) + 70
       // Process frame scores if available
-      let frames = []
-      if (assessmentResult.frame_scores && Array.isArray(assessmentResult.frame_scores)) {
-        frames = assessmentResult.frame_scores.map((score, index) => ({
-          frame: index + 1,
-          score: score,
-        }))
-      } else {
-        // Fallback to random data if not available
-        frames = Array.from({ length: 10 }, (_, i) => ({
-          frame: i + 1,
-          score: Math.floor(Math.random() * 31) + 70,
-        }))
-      }
-
-      // Get worst frames
-      const sortedFrames = [...frames].sort((a, b) => a.score - b.score)
-      const worst = sortedFrames.slice(0, 3)
-
-      // Update state with results
-      setEvaluationScore(score)
-      setFrameScores(frames)
-      setWorstFrames(worst)
 
       // Show results
       setIsEvaluating(false)
       setShowResults(true)
+
     } catch (error) {
       console.error("Evaluation error:", error)
       Alert.alert("评估失败", "无法完成动作评估，请重试。" + (error.message || ""), [
@@ -257,9 +238,7 @@ const MotionAssessmentScreen = () => {
     setUserVideoRecorded(false)
     setUserVideoPath(null)
     setShowResults(false)
-    setEvaluationScore(null)
-    setFrameScores([])
-    setWorstFrames([])
+    setResultData(null)
     setUploadProgress(0)
   }
 
@@ -275,9 +254,7 @@ const MotionAssessmentScreen = () => {
         />
       ) : (
         <ShowResult
-          evaluationScore={evaluationScore}
-          frameScores={frameScores}
-          worstFrames={worstFrames}
+          resultData={resultData}
           onReset={handleReset}
         />
       )}
