@@ -1,19 +1,33 @@
 import React, { useState, useRef } from "react"
-import { StyleSheet, View, Text, Modal, ActivityIndicator, Dimensions, Alert, Platform } from "react-native"
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  Modal, 
+  ActivityIndicator, 
+  Dimensions, 
+  Alert, 
+  Platform,
+  TouchableOpacity,
+  StatusBar,
+  SafeAreaView
+} from "react-native"
 import { BlurView } from "@react-native-community/blur"
 import { useCameraDevice, useCameraPermission } from "react-native-vision-camera"
 import RNFS from "react-native-fs"
+import LinearGradient from "react-native-linear-gradient"
+import Icon from "react-native-vector-icons/Ionicons"
 
 import ChooseVideo from "./MotionAssess/ChooseVideo"
 import ShowCamera from "./MotionAssess/ShowCamera"
 import ShowResult from "./MotionAssess/ShowResult"
 
-const { width } = Dimensions.get("window")
+const { width, height } = Dimensions.get("window")
 
 // Backend API URL
 const API_BASE_URL = "https://yfvideo.hf.free4inno.com"
 
-const MotionAssessmentScreen = () => {
+const MotionAssessmentScreen = ({ navigation }) => {
   const [selectedStandardVideo, setSelectedStandardVideo] = useState(null)
   const [userVideoRecorded, setUserVideoRecorded] = useState(false)
   const [userVideoPath, setUserVideoPath] = useState(null)
@@ -23,9 +37,6 @@ const MotionAssessmentScreen = () => {
   const [recordingStarted, setRecordingStarted] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const [isEvaluating, setIsEvaluating] = useState(false)
-  // const [evaluationScore, setEvaluationScore] = useState(null)
-  // const [frameScores, setFrameScores] = useState([])
-  // const [worstFrames, setWorstFrames] = useState([])
   const [resultData, setResultData] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
 
@@ -41,7 +52,10 @@ const MotionAssessmentScreen = () => {
     if (!hasPermission) {
       const granted = await requestPermission()
       if (!granted) {
-        alert("需要相机权限来录制视频")
+        Alert.alert("权限请求", "需要相机权限来录制视频", [
+          { text: "取消", style: "cancel" },
+          { text: "设置", onPress: () => requestPermission() }
+        ])
         return
       }
     }
@@ -145,8 +159,7 @@ const MotionAssessmentScreen = () => {
       }
 
       console.log("Uploading video to server...")
-      console.log("exercise:",requestBody.exercise.substring(0,100))
-      console.log("standard_numeric_id:",requestBody.standard_numeric_id)
+
       const response = await fetch(`${API_BASE_URL}/upload-video/`, {
         method: "POST",
         body: JSON.stringify(requestBody),
@@ -201,30 +214,30 @@ const MotionAssessmentScreen = () => {
       const uploadResult = await uploadVideo()
 
       if (!uploadResult) {
-        throw new Error("Failed to upload video or get assessment ID")
+        throw new Error("Failed to upload video")
       }
 
       setUploadProgress(50)
+      
+      // 模拟进度增加
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 95) {
+            clearInterval(progressInterval)
+            return 95
+          }
+          return prev + 5
+        })
+      }, 300)
 
-      // Step 2: Get assessment results using the assessment ID
-      const assessmentResult = uploadResult;
-
-      if (!assessmentResult) {
-        throw new Error("Failed to get assessment results")
-      }
-      setResultData(assessmentResult)
-
-      setUploadProgress(100)
-
-      // Step 3: Process and display the results
-      // This is just an example - adjust according to your actual API response structure
-      // const score = assessmentResult.overall_score || Math.floor(Math.random() * 31) + 70
-      // Process frame scores if available
-
-      // Show results
-      setIsEvaluating(false)
-      setShowResults(true)
-
+      // 延迟一下，模拟处理时间
+      setTimeout(() => {
+        clearInterval(progressInterval)
+        setUploadProgress(100)
+        setResultData(uploadResult)
+        setIsEvaluating(false)
+        setShowResults(true)
+      }, 2000)
     } catch (error) {
       console.error("Evaluation error:", error)
       Alert.alert("评估失败", "无法完成动作评估，请重试。" + (error.message || ""), [
@@ -244,21 +257,58 @@ const MotionAssessmentScreen = () => {
 
   return (
     <View style={styles.container}>
-      {!showResults ? (
-        <ChooseVideo
-          selectedStandardVideo={selectedStandardVideo}
-          userVideoRecorded={userVideoRecorded}
-          onSelectStandardVideo={handleSelectStandardVideo}
-          onStartRecording={handleStartRecording}
-          onStartEvaluation={handleStartEvaluation}
-        />
-      ) : (
-        <ShowResult
-          resultData={resultData}
-          onReset={handleReset}
-        />
-      )}
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      
+      {/* 背景渐变 */}
+      <LinearGradient
+        colors={['#53bee8', '#128aea', '#4cc9f0']}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 1}}
+        style={styles.background}
+      />
+      
+      {/* 顶部导航栏 */}
+      <SafeAreaView style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Icon name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>动作评估</Text>
+        <TouchableOpacity 
+          style={styles.helpButton}
+          onPress={() => Alert.alert("帮助", "动作评估功能可以帮助您评估康复动作的准确性。\n\n1. 选择标准视频\n2. 录制您的动作\n3. 开始评估\n4. 查看结果")}
+        >
+          <Icon name="help-circle-outline" size={24} color="#fff" />
+        </TouchableOpacity>
+      </SafeAreaView>
+      
+      {/* 主内容区域 */}
+      <View style={styles.contentContainer}>
+        {!showResults ? (
+          <View style={styles.chooseVideoContainer}>
+            <ChooseVideo
+              selectedStandardVideo={selectedStandardVideo}
+              userVideoRecorded={userVideoRecorded}
+              onSelectStandardVideo={handleSelectStandardVideo}
+              onStartRecording={handleStartRecording}
+              onStartEvaluation={handleStartEvaluation}
+              customStyles={chooseVideoStyles}
+            />
+          </View>
+        ) : (
+          <View style={styles.resultContainer}>
+            <ShowResult
+              resultData={resultData}
+              onReset={handleReset}
+              customStyles={resultStyles}
+            />
+          </View>
+        )}
+      </View>
 
+      {/* 相机组件 */}
       <ShowCamera
         showCamera={showCamera}
         device={device}
@@ -269,8 +319,10 @@ const MotionAssessmentScreen = () => {
         onStopRecording={stopRecording}
         onClickAtCamera={onClickAtCamera}
         onCloseCamera={() => setShowCamera(false)}
+        customStyles={cameraStyles}
       />
 
+      {/* 评估加载模态框 */}
       <Modal visible={isEvaluating} transparent={true} animationType="fade">
         <View style={styles.loadingModalContainer}>
           <BlurView
@@ -280,7 +332,7 @@ const MotionAssessmentScreen = () => {
             reducedTransparencyFallbackColor="white"
           >
             <View style={styles.loadingContent}>
-              <ActivityIndicator size="large" color="#3b82f6" />
+              <ActivityIndicator size="large" color="#4361ee" />
               <Text style={styles.loadingText}>{uploadProgress < 50 ? "正在上传视频..." : "正在评估动作..."}</Text>
               {/* Progress indicator */}
               <View style={styles.progressContainer}>
@@ -295,20 +347,254 @@ const MotionAssessmentScreen = () => {
   )
 }
 
+// 为子组件提供的自定义样式
+const chooseVideoStyles = {
+  container: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  title: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  videoItem: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 15,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  videoItemSelected: {
+    backgroundColor: 'rgba(67, 97, 238, 0.3)',
+    borderColor: '#4361ee',
+  },
+  videoTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  videoDescription: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+  },
+  buttonContainer: {
+    marginTop: 20,
+  },
+  button: {
+    backgroundColor: 'rgba(67, 97, 238, 0.8)',
+    borderRadius: 25,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  buttonDisabled: {
+    backgroundColor: 'rgba(100, 116, 139, 0.5)',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  recordedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+  },
+  recordedText: {
+    color: '#4ade80',
+    marginLeft: 5,
+    fontSize: 14,
+  }
+}
+
+const cameraStyles = {
+  container: {
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+  },
+  camera: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  controlsContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 15,
+  },
+  closeButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+    padding: 10,
+  },
+  captureButton: {
+    backgroundColor: '#4361ee',
+    borderRadius: 35,
+    height: 70,
+    width: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  countdownText: {
+    color: '#fff',
+    fontSize: 60,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 5,
+  },
+  recordingIndicator: {
+    backgroundColor: 'rgba(239, 68, 68, 0.7)',
+    borderRadius: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+  }
+}
+
+const resultStyles = {
+  container: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  title: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  scoreContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 15,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  scoreText: {
+    color: '#fff',
+    fontSize: 48,
+    fontWeight: 'bold',
+  },
+  feedbackContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  feedbackTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  feedbackText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  button: {
+    backgroundColor: 'rgba(67, 97, 238, 0.8)',
+    borderRadius: 25,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  }
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f0f8ff",
+  },
+  background: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 16,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    zIndex: 10,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 20,
+    top: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  helpButton: {
+    position: 'absolute',
+    right: 20,
+    top: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight + 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contentContainer: {
+    flex: 1,
+    padding: 20,
+    paddingTop: 10,
+  },
+  chooseVideoContainer: {
+    flex: 1,
+  },
+  resultContainer: {
+    flex: 1,
   },
   loadingModalContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   loadingBlur: {
-    width: 200,
-    height: 200,
+    width: 220,
+    height: 220,
     borderRadius: 20,
     overflow: "hidden",
     justifyContent: "center",
@@ -323,26 +609,26 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 15,
     fontSize: 16,
-    color: "#334155",
+    color: "#fff",
     fontWeight: "500",
     marginBottom: 10,
   },
   progressContainer: {
     width: "80%",
     height: 6,
-    backgroundColor: "rgba(0, 0, 0, 0.1)",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     borderRadius: 3,
     overflow: "hidden",
     marginTop: 10,
   },
   progressBar: {
     height: "100%",
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#4361ee",
   },
   progressText: {
     marginTop: 5,
-    fontSize: 12,
-    color: "#64748b",
+    fontSize: 14,
+    color: "#fff",
   },
 })
 

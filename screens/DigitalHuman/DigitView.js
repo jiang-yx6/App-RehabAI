@@ -14,7 +14,8 @@ export const DigitView = ({ videoRef, isConnected, remoteStream }) => {
             ref={videoRef}
             streamURL={remoteStream.toURL()}
             objectFit="cover"
-            style={styles.digitalHuman}
+            style={[styles.digitalHuman,{
+            }]}
             zOrder={0}
             mirror={false}
           />
@@ -28,13 +29,11 @@ export const DigitView = ({ videoRef, isConnected, remoteStream }) => {
 
 const styles = StyleSheet.create({
   digitalHumanContainer: {
-    height: "90%",
+    height: "100%",
     width: "100%",
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
   },
   blurView: {
     width: "100%",
@@ -43,7 +42,7 @@ const styles = StyleSheet.create({
   },
   digitalHuman: {
     width: width,
-    height: height * 0.8,
+    height: height,
     
   },
 })

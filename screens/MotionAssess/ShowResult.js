@@ -49,15 +49,15 @@ const ShowResult = ({ resultData, onReset }) => {
       setWorstFrames(
         worstFramesData.map((frame, index) => ({
           frame: index + 1,
-          image: `${API_BASE_URL + frame}`,
+          image: API_BASE_URL + frame,
           score: frameScoresObj[frame] || 0,
         })),
       )
 
       // 设置视频流
-      setStandardVideoHLS(`${API_BASE_URL + resultData.standard_video_hls}`)
-      setExerciseVideoHLS(`${API_BASE_URL + resultData.exercise_video_hls}`)
-      setOverlapVideoHLS(`${API_BASE_URL + resultData.overlap_video_hls}`)
+      setStandardVideoHLS(API_BASE_URL + resultData.standard_video_hls)
+      setExerciseVideoHLS(API_BASE_URL + resultData.exercise_video_hls)
+      setOverlapVideoHLS(API_BASE_URL + resultData.overlap_video_hls)
     }
   }, [resultData])
 

@@ -1,91 +1,286 @@
-import { StyleSheet, View, Text, TouchableOpacity, ImageBackground } from "react-native"
-import { BlurView } from "@react-native-community/blur"
+import React, { useEffect } from "react"
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  ImageBackground,
+  StatusBar,
+  Animated,
+  Dimensions,
+  Platform,
+  SafeAreaView
+} from "react-native"
+import LinearGradient from "react-native-linear-gradient"
+
+const { width, height } = Dimensions.get('window')
 
 const HomeScreen = ({ navigation }) => {
+  // 动画值
+  const fadeAnim = new Animated.Value(0)
+  const slideAnim = new Animated.Value(50)
+  const scaleAnim = new Animated.Value(0.95)
+  
+  useEffect(() => {
+    // 组件加载时启动动画
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    ]).start()
+  }, [])
+
   return (
-    <ImageBackground source={require("../assets/background.png")} style={styles.background}>
-      <BlurView style={styles.blurContainer} blurType="light" blurAmount={10} reducedTransparencyFallbackColor="white">
-        <View style={styles.container}>
-          <Text style={styles.title}>康途向导</Text>
-          <Text style={styles.subtitle}>智能辅助您的康复之旅</Text>
+    <View style={styles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      
+      {/* 全屏背景图片 */}
+      <ImageBackground 
+        source={require("../assets/doctor.jpg")} 
+        style={styles.background}
+        imageStyle={styles.backgroundImage}
+      >
+        {/* 渐变遮罩层 - 增强可读性同时展示背景 */}
+        <LinearGradient
+          colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.6)']}
+          locations={[0, 0.8]}
+          style={styles.gradient}
+        />
+        
+        <SafeAreaView style={styles.safeArea}>
+          {/* 标题区域 - 已移至顶部 */}
+          <Animated.View 
+            style={[
+              styles.headerContainer, 
+              {
+                opacity: fadeAnim,
+                transform: [
+                  { translateY: slideAnim },
+                  { scale: scaleAnim }
+                ]
+              }
+            ]}
+          >
+            <Text style={styles.title}>康途向导</Text>
+            <Text style={styles.subtitle}>智能辅助您的康复之旅</Text>
+          </Animated.View>
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("DigitalHuman")}>
-              <View style={styles.buttonInner}>
-                <Text style={styles.buttonText}>数字人交互</Text>
-              </View>
-            </TouchableOpacity>
+          <View style={styles.contentContainer}>
+            {/* Logo区域 - 移至中部 */}
+            <Animated.View 
+              style={[
+                styles.logoContainer, 
+                {
+                  opacity: fadeAnim,
+                  transform: [{ scale: scaleAnim }]
+                }
+              ]}
+            >
+              {/* <View style={styles.logoCircle}>
+                <Text style={styles.logoText}>康</Text>
+              </View> */}
+            </Animated.View>
 
-            <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("MotionAssessment")}>
-              <View style={styles.buttonInner}>
-                <Text style={styles.buttonText}>动作评估</Text>
-              </View>
-            </TouchableOpacity>
+            {/* 动画按钮区域 */}
+            <Animated.View 
+              style={[
+                styles.buttonContainer,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }]
+                }
+              ]}
+            >
+              <TouchableOpacity 
+                style={styles.buttonWrapper} 
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate("DigitalHuman")}
+              >
+                <LinearGradient
+                  colors={['#4361ee', '#3a0ca3']}
+                  start={{x: 0, y: 0}}
+                  end={{x: 1, y: 1}}
+                  style={styles.button}
+                >
+                  <View style={styles.buttonIconContainer}>
+                    <View style={styles.buttonIcon} />
+                  </View>
+                  <Text style={styles.buttonText}>数字人交互</Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
-            {/* <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Recorder")}>
-              <View style={styles.buttonInner}>
-                <Text style={styles.buttonText}>语音Test</Text>
-              </View>
-            </TouchableOpacity> */}
+              <TouchableOpacity 
+                style={styles.buttonWrapper} 
+                activeOpacity={0.8}
+                onPress={() => navigation.navigate("MotionAssessment")}
+              >
+                <LinearGradient
+                  colors={['#4cc9f0', '#4361ee']}
+                  start={{x: 0, y: 0}}
+                  end={{x: 1, y: 1}}
+                  style={styles.button}
+                >
+                  <View style={styles.buttonIconContainer}>
+                    <View style={styles.buttonIcon} />
+                  </View>
+                  <Text style={styles.buttonText}>动作评估</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+            
+            {/* 底部装饰元素 */}
+            <Animated.View 
+              style={[
+                styles.footer,
+                {
+                  opacity: fadeAnim,
+                }
+              ]}
+            >
+              <View style={styles.footerLine} />
+              <Text style={styles.footerText}>智慧康复 · 科技护航</Text>
+            </Animated.View>
           </View>
-        </View>
-      </BlurView>
-    </ImageBackground>
+        </SafeAreaView>
+      </ImageBackground>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   background: {
     flex: 1,
     width: "100%",
     height: "100%",
   },
-  blurContainer: {
-    flex: 1,
-    padding: 20,
+  backgroundImage: {
+    resizeMode: "cover",
   },
-  container: {
+  gradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  safeArea: {
     flex: 1,
+  },
+  headerContainer: {
     alignItems: "center",
-    justifyContent: "center",
+    paddingTop: StatusBar.currentHeight + 10,
+    paddingHorizontal: 24,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "bold",
-    color: "#1e40af",
-    marginBottom: 10,
+    color: "#ffffff",
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 5,
+    letterSpacing: 3,
   },
   subtitle: {
     fontSize: 16,
-    color: "#64748b",
-    marginBottom: 40,
+    color: "#f8fafc",
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+    letterSpacing: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: "space-between",
+    padding: 24,
+    paddingTop: 40,
+    paddingBottom: 40,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
   },
   buttonContainer: {
-    width: "100%",
-    maxWidth: 300,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 16,
+  },
+  buttonWrapper: {
+    flex: 1,
+    borderRadius: 24,
+    overflow: 'hidden',
+    height: 120,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   button: {
-    borderRadius: 15,
-    overflow: "hidden",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    marginBottom: 20,
-  },
-  buttonInner: {
-    backgroundColor: "#3b82f6",
-    paddingVertical: 15,
+    flex: 1,
     alignItems: "center",
-    borderRadius: 15,
+    justifyContent: "center",
+    borderRadius: 24,
+    padding: 20,
+  },
+  buttonIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  buttonIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   buttonText: {
     color: "white",
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "700",
+    textAlign: "center",
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
+  footer: {
+    alignItems: 'center',
+    marginTop: 30,
+  },
+  footerLine: {
+    width: 60,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    borderRadius: 2,
+    marginBottom: 12,
+  },
+  footerText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+    letterSpacing: 2,
+  }
 })
 
 export default HomeScreen
-

@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     padding: 15,
-    backgroundColor: "white",
+    backgroundColor: "#53bee8e9",
     borderRadius: 15,
     margin: 15,
     shadowColor: "#000",
@@ -205,15 +205,15 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 10,
+    padding: 20,
     borderRadius: 10,
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     flex: 1,
     marginHorizontal: 5,
     justifyContent: "center",
   },
   activeButton: {
-    backgroundColor: "#dbeafe",
+    backgroundColor: "skyblue",
   },
   buttonText: {
     marginLeft: 8,
