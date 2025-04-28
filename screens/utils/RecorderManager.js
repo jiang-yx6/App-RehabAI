@@ -17,7 +17,6 @@ class RecorderManager {
   }
 
   async requestPermissions() {
-    if (Platform.OS === "android") {
       try {
         // 只请求录音权限
         const granted = await PermissionsAndroid.request(
@@ -40,8 +39,6 @@ class RecorderManager {
         console.error("权限请求失败:", error);
         throw error;
       }
-    }
-    return true;
   }
 
   async init() {

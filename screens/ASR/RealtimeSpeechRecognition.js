@@ -3,8 +3,8 @@
 // RealtimeSpeechRecognition.js
 import { useEffect, useState, useRef } from "react"
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from "react-native"
-import WebSocketManager from "./utils/WebSocketManager"
-import RecorderManager from "./utils/RecorderManager"
+import WebSocketManager from "../utils/WebSocketManager"
+import RecorderManager from "../utils/RecorderManager"
 
 const RealtimeSpeechRecognition = () => {
   const [recording, setRecording] = useState(false)

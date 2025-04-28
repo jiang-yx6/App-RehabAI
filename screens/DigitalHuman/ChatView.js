@@ -12,13 +12,13 @@ import {
   Dimensions,
   Animated,
   Platform,
-  KeyboardAvoidingView,
   Keyboard,
 } from "react-native"
 import Microphone from "./Microphone"
 import Icon from "react-native-vector-icons/Ionicons"
+import TypingIndicator from "../utils/TypingIndicator"
 
-const { height } = Dimensions.get("window")
+const { width, height } = Dimensions.get("window")
 
 const ChatView = ({ sessionId, isConnected, audioStream }) => {
   const [input, setInput] = useState("") // 输入框内容
@@ -27,9 +27,15 @@ const ChatView = ({ sessionId, isConnected, audioStream }) => {
   const [isExpanded, setIsExpanded] = useState(false) // 聊天内容是否展开
   const [micStatus, setMicStatus] = useState("")
   const [showMicStatus, setShowMicStatus] = useState(false)
+  const [isStreaming, setIsStreaming] = useState(false) // 是否正在流式输出
+  const [fullText, setFullText] = useState("") // 完整的回复文本
+  const [streamIndex, setStreamIndex] = useState(0) // 当前流式输出的索引
+
   const statusOpacity = useRef(new Animated.Value(0)).current
-  const scrollViewRef = useRef(null) // 确保使用 null 初始化
+  const scrollViewRef = useRef(null)
   const inputRef = useRef(null)
+  const streamTimerRef = useRef(null)
+  const chatContainerHeight = useRef(new Animated.Value(isExpanded ? 300 : 150)).current
 
   useEffect(() => {
     if (audioStream) {
@@ -47,6 +53,100 @@ const ChatView = ({ sessionId, isConnected, audioStream }) => {
     }
   }, [audioStream])
 
+  // 确保在消息更新后滚动到底部
+  useEffect(() => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true })
+    }, 100)
+  }, [messages])
+
+  // 动画展开/收起聊天窗口
+  useEffect(() => {
+    Animated.timing(chatContainerHeight, {
+      toValue: isExpanded ? 300 : 150,
+      duration: 300,
+      useNativeDriver: false,
+    }).start(() => {
+      // 动画完成后滚动到底部
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true })
+      }, 100)
+    })
+  }, [isExpanded])
+
+  // 流式输出效果
+  useEffect(() => {
+    // 清理函数，确保组件卸载时清除定时器
+    return () => {
+      if (streamTimerRef.current) {
+        clearInterval(streamTimerRef.current)
+      }
+    }
+  }, [])
+
+  // 处理流式输出
+  useEffect(() => {
+    if (isStreaming && streamIndex < fullText.length) {
+      // 每隔一小段时间增加显示的文本长度
+      streamTimerRef.current = setInterval(() => {
+        // 随机决定每次增加的字符数，模拟真实打字速度的变化
+        const increment = Math.floor(Math.random() * 3) + 1
+        const nextIndex = Math.min(streamIndex + increment, fullText.length)
+        setStreamIndex(nextIndex)
+
+        // 更新消息列表中的最后一条消息
+        setMessages((prevMessages) => {
+          const updatedMessages = [...prevMessages]
+          if (updatedMessages.length > 0) {
+            const lastMessage = updatedMessages[updatedMessages.length - 1]
+            if (!lastMessage.isUser) {
+              updatedMessages[updatedMessages.length - 1] = {
+                ...lastMessage,
+                text: fullText.substring(0, nextIndex),
+              }
+            }
+          }
+          return updatedMessages
+        })
+
+        // 滚动到底部以跟随文本增长
+        scrollViewRef.current?.scrollToEnd({ animated: false })
+
+        // 如果已经显示完全部文本，停止流式输出
+        if (nextIndex >= fullText.length) {
+          clearInterval(streamTimerRef.current)
+          setIsStreaming(false)
+        }
+      }, 30) // 调整时间间隔可以改变打字速度
+    }
+
+    return () => {
+      if (streamTimerRef.current) {
+        clearInterval(streamTimerRef.current)
+      }
+    }
+  }, [isStreaming, streamIndex, fullText])
+
+  // 开始流式输出
+  const startStreaming = (text) => {
+    // 清除之前的流式输出
+    if (streamTimerRef.current) {
+      clearInterval(streamTimerRef.current)
+    }
+
+    setFullText(text)
+    setStreamIndex(0)
+    setIsStreaming(true)
+
+    // 添加一个初始的空消息，后续会更新这条消息
+    const aiResponse = {
+      id: Date.now() + 1,
+      text: "",
+      isUser: false,
+    }
+    setMessages((prev) => [...prev, aiResponse])
+  }
+
   const handleSendMessage = async () => {
     if (input.trim() === "") return
 
@@ -60,36 +160,44 @@ const ChatView = ({ sessionId, isConnected, audioStream }) => {
     setInput("")
     setIsLoading(true)
     console.log("发送给服务器的文本：", input.trim())
-    const response = await fetch("http://10.3.242.26:8010/human", {
-      body: JSON.stringify({
-        text: input.trim(),
-        type: "chat",
-        interrupt: true,
-        sessionid: sessionId,
-      }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-    })
 
-    const data = await response.json()
-    if (data.llm_response) {
-      console.log("AI响应")
-      const aiResponse = {
+    try {
+      const response = await fetch("http://10.3.242.26:8010/human", {
+        body: JSON.stringify({
+          text: input.trim(),
+          type: "chat",
+          interrupt: true,
+          sessionid: sessionId,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      })
+
+      const data = await response.json()
+      if (data.llm_response) {
+        console.log("AI响应")
+        // 开始流式输出AI回复
+        startStreaming(data.llm_response)
+      } else {
+        // 如果没有有效响应，显示错误消息
+        const aiResponse = {
+          id: Date.now() + 1,
+          text: "抱歉，我无法理解您的问题。",
+          isUser: false,
+        }
+        setMessages((prev) => [...prev, aiResponse])
+      }
+    } catch (error) {
+      console.error("发送消息失败:", error)
+      const errorResponse = {
         id: Date.now() + 1,
-        text: data.llm_response,
+        text: "发送消息失败，请检查网络连接。",
         isUser: false,
       }
-      setMessages((prev) => [...prev, aiResponse])
-      setIsLoading(false)
-    } else {
-      const aiResponse = {
-        id: Date.now() + 1,
-        text: "抱歉，我无法理解您的问题。",
-        isUser: false,
-      }
-      setMessages((prev) => [...prev, aiResponse])
+      setMessages((prev) => [...prev, errorResponse])
+    } finally {
       setIsLoading(false)
     }
   }
@@ -123,14 +231,16 @@ const ChatView = ({ sessionId, isConnected, audioStream }) => {
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener("keyboardDidShow", () => {
       // 键盘显示时，确保滚动到底部
-      scrollViewRef.current?.scrollToEnd({ animated: true })
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true })
+      }, 100)
     })
 
     const keyboardDidHideListener = Keyboard.addListener("keyboardDidHide", () => {
       // 键盘隐藏时，确保滚动到底部
-      scrollViewRef.current?.scrollToEnd({ animated: true })
-      // 键盘隐藏时，让输入框失去焦点
-      inputRef.current?.blur()
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true })
+      }, 100)
     })
 
     return () => {
@@ -140,29 +250,34 @@ const ChatView = ({ sessionId, isConnected, audioStream }) => {
   }, [])
 
   return (
-    <KeyboardAvoidingView style={styles.keyboardAvoidingView} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      <View style={[styles.chatContainer, isExpanded ? styles.chatContainerExpanded : null]}>
-        {showMicStatus && (
-          <Animated.View style={[styles.statusOverlay, { opacity: statusOpacity }]}>
-            <Text style={styles.statusText}>{micStatus}</Text>
-          </Animated.View>
-        )}
+    <View style={styles.container}>
+      {/* 状态提示 */}
+      {showMicStatus && (
+        <Animated.View style={[styles.statusOverlay, { opacity: statusOpacity }]}>
+          <Text style={styles.statusText}>{micStatus}</Text>
+        </Animated.View>
+      )}
 
-        {/* 展开菜单 */}
-        <TouchableOpacity style={styles.expandButton} onPress={toggleExpand}>
-          <Icon name={isExpanded ? "chevron-down" : "chevron-up"} size={20} color="#3b82f6" />
-        </TouchableOpacity>
+      {/* 展开/收起按钮 */}
+      <TouchableOpacity style={styles.expandButton} onPress={toggleExpand}>
+        <Icon name={isExpanded ? "chevron-down" : "chevron-up"} size={20} color="#3b82f6" />
+        <Text style={styles.expandButtonText}>{isExpanded ? "收起" : "展开"}</Text>
+      </TouchableOpacity>
 
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-          keyboardShouldPersistTaps="always"
-        >
+      {/* 消息列表区域 */}
+      <Animated.View style={[styles.messagesWrapper, { height: chatContainerHeight }]}>
+        <ScrollView ref={scrollViewRef} style={styles.messagesContainer} contentContainerStyle={styles.messagesContent}>
           {messages.map((message) => (
             <View key={message.id} style={[styles.messageBubble, message.isUser ? styles.userBubble : styles.aiBubble]}>
               <Text style={message.isUser ? styles.userMessageText : styles.aiMessageText}>{message.text}</Text>
+              {!message.isUser &&
+                isStreaming &&
+                message.id === messages[messages.length - 1]?.id &&
+                message.text !== fullText && (
+                  <View style={styles.typingIndicatorWrapper}>
+                    <TypingIndicator />
+                  </View>
+                )}
             </View>
           ))}
           {isLoading && (
@@ -172,7 +287,10 @@ const ChatView = ({ sessionId, isConnected, audioStream }) => {
             </View>
           )}
         </ScrollView>
+      </Animated.View>
 
+      {/* 输入区域 - 固定在底部 */}
+      <View style={styles.inputWrapper}>
         <View style={styles.inputContainer}>
           <TextInput
             ref={inputRef}
@@ -181,61 +299,83 @@ const ChatView = ({ sessionId, isConnected, audioStream }) => {
             onChangeText={setInput}
             placeholder="请输入您的问题..."
             placeholderTextColor="#a0aec0"
+            multiline={false}
           />
           <Microphone handleVoiceInput={handleVoiceInput} onStatusChange={showStatusMessage} />
-          <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage} disabled={input.trim() === ""}>
-            <Icon name="send" size={24} color="white" />
+          <TouchableOpacity
+            style={[styles.sendButton, input.trim() === "" ? styles.sendButtonDisabled : null]}
+            onPress={handleSendMessage}
+            disabled={input.trim() === ""}
+          >
+            <Icon name="send" size={24} color={input.trim() === "" ? "#CBD5E0" : "white"} />
           </TouchableOpacity>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  keyboardAvoidingView: {
-    flex: 1,
+  container: {
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    position: "relative",
   },
-  chatContainer: {
+  statusOverlay: {
     position: "absolute",
-    maxHeight: height * 0.2,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
+    top: 10,
+    left: "50%",
+    transform: [{ translateX: -100 }],
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     padding: 10,
-    backgroundColor: "rgba(255, 255, 255, 0.8)",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 5,
+    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    zIndex: 1000,
+    width: 200,
+    justifyContent: "center",
   },
-  chatContainerExpanded: {
-    maxHeight: height * 0.5,
+  statusText: {
+    color: "#fff",
+    fontSize: 14,
+    textAlign: "center",
   },
   expandButton: {
-    position: "absolute",
-    top: -5,
-    alignSelf: "center",
-    padding: 2,
-    marginBottom: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(203, 213, 224, 0.5)",
+  },
+  expandButtonText: {
+    marginLeft: 5,
+    color: "#3b82f6",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  messagesWrapper: {
+    width: "100%",
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
   },
   messagesContainer: {
     flex: 1,
-    marginBottom: 8,
+    width: "100%",
   },
   messagesContent: {
-    paddingTop: 8,
-    paddingBottom: 8,
+    padding: 10,
+    paddingBottom: 15,
   },
   messageBubble: {
     maxWidth: "80%",
     padding: 12,
     borderRadius: 18,
     marginVertical: 5,
+    position: "relative",
   },
   userBubble: {
     backgroundColor: "#3b82f6",
@@ -248,11 +388,11 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 4,
   },
   userMessageText: {
-    fontSize: 14,
+    fontSize: 16,
     color: "white",
   },
   aiMessageText: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#334155",
   },
   loadingContainer: {
@@ -266,13 +406,20 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginLeft: 8,
-    fontSize: 12,
+    fontSize: 14,
     color: "#64748b",
+  },
+  inputWrapper: {
+    width: "100%",
+    padding: 10,
+    paddingBottom: Platform.OS === "ios" ? 20 : 10,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(203, 213, 224, 0.5)",
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    height: 50,
     backgroundColor: "#fff",
     borderRadius: 25,
     paddingHorizontal: 15,
@@ -282,44 +429,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-    zIndex: 1000001, // 确保输入框在最上层
   },
   input: {
     flex: 1,
     fontSize: 16,
-    maxHeight: 100,
-    paddingVertical: 10,
+    height: 40,
     color: "#334155",
-  },
-  voiceButton: {
-    marginHorizontal: 5,
-    padding: 8,
   },
   sendButton: {
     backgroundColor: "#3b82f6",
-    borderRadius: 10,
-    padding: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  statusOverlay: {
-    position: "absolute",
-    top: 10,
-    left: "50%",
-    transform: [{ translateX: -100 }],
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    padding: 10,
     borderRadius: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    zIndex: 1000,
-    width: 200,
+    width: 40,
+    height: 40,
     justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 5,
   },
-  statusText: {
-    color: "#fff",
-    marginRight: 8,
-    fontSize: 14,
+  sendButtonDisabled: {
+    backgroundColor: "#E2E8F0",
+  },
+  typingIndicatorWrapper: {
+    marginTop: 4,
+    marginLeft: 4,
+    height: 16,
   },
 })
 

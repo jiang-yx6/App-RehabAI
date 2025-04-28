@@ -5,6 +5,7 @@ import { BlurView } from "@react-native-community/blur"
 const { width } = Dimensions.get("window")
 const { height } = Dimensions.get("window")
 
+
 export const DigitView = ({ videoRef, isConnected, remoteStream }) => {
   return (
     <View style={styles.digitalHumanContainer}>
@@ -13,11 +14,15 @@ export const DigitView = ({ videoRef, isConnected, remoteStream }) => {
           <RTCView
             ref={videoRef}
             streamURL={remoteStream.toURL()}
-            objectFit="cover"
-            style={[styles.digitalHuman,{
+            objectFit="none"
+            style={[styles.digitalHuman, {
+              width: width,
+              height: height,
+              transform: [
+                { scale: 4 },
+                { translateX: width * 0.1 },
+              ]
             }]}
-            zOrder={0}
-            mirror={false}
           />
         ) : (
           <Image source={require("../../assets/doctor.jpg")} style={styles.digitalHuman} />
@@ -41,8 +46,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   digitalHuman: {
-    width: width,
-    height: height,
-    
+    flex: 1,
   },
 })

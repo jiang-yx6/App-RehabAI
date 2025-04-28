@@ -3,8 +3,8 @@
 import { View, StyleSheet, TouchableOpacity } from "react-native"
 import { useState, useEffect, useImperativeHandle, forwardRef } from "react"
 import Icon from "react-native-vector-icons/Ionicons"
-import RecorderManager from "../ASR/utils/RecorderManager"
-import WebSocketManager from "../ASR/utils/WebSocketManager"
+import RecorderManager from "../utils/RecorderManager"
+import WebSocketManager from "../utils/WebSocketManager"
 
 const Microphone = forwardRef((props, ref) => {
   const [recording, setRecording] = useState(false)

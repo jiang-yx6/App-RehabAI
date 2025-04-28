@@ -247,6 +247,7 @@ const DigitalHumanScreen = ({ navigation }) => {
   useEffect(() => {
     return () => handleDisconnect()
   }, [])
+
   const requestPermissions = async () => {
     if (Platform.OS === "android") {
       try {
@@ -527,19 +528,6 @@ const DigitalHumanScreen = ({ navigation }) => {
             <Text style={styles.loadingText}>正在连接...</Text>
           </View>
         )}
-
-        {/* 已连接状态下的控制按钮 */}
-        {/* {isConnected && (
-          <View style={styles.controlsContainer}>
-            <TouchableOpacity 
-              style={styles.controlButton}
-              onPress={handleDisconnect}
-            >
-              <Icon name="close-circle" size={24} color="#fff" />
-              <Text style={styles.controlButtonText}>断开</Text>
-            </TouchableOpacity>
-          </View>
-        )} */}
       </View>
 
       {/* 聊天视图 - 仅在连接且showChat为true时显示 */}
@@ -552,46 +540,10 @@ const DigitalHumanScreen = ({ navigation }) => {
   )
 }
 
-// 为ChatView组件提供的自定义样式
-const chatViewStyles = {
-  chatContainer: {
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  inputContainer: {
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-  },
-  userBubble: {
-    backgroundColor: "#4361ee",
-  },
-  aiBubble: {
-    backgroundColor: "rgba(226, 232, 240, 0.8)",
-  },
-  userMessageText: {
-    color: "#fff",
-  },
-  aiMessageText: {
-    color: "#334155",
-  },
-  sendButton: {
-    backgroundColor: "#4361ee",
-  },
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    position: "relative",
   },
   background: {
     position: "absolute",
@@ -649,9 +601,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  digitView: {
-    flex: 1,
-  },
   bottomContainer: {
     position: "absolute",
     bottom: 0,
@@ -701,33 +650,22 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 16,
   },
-  controlsContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    width: "100%",
-  },
-  controlButton: {
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  controlButtonText: {
-    color: "#fff",
-    marginLeft: 8,
-    fontSize: 16,
-  },
   chatContainer: {
-    backgroundColor: "yellow",
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    maxHeight: "40%",
+    maxHeight: height * 0.6, // 限制最大高度为屏幕高度的60%
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: "hidden",
     zIndex: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.55)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 10,
   },
 })
 

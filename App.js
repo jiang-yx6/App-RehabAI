@@ -1,6 +1,6 @@
 import { NavigationContainer } from "@react-navigation/native"
 import { createStackNavigator } from "@react-navigation/stack"
-import { StatusBar ,View,Text} from "react-native"
+import { StatusBar} from "react-native"
 
 //Import screens
 import HomeScreen from "./screens/HomeScreen"
