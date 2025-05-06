@@ -24,9 +24,9 @@ import ChatView from "./DigitalHuman/ChatView"
 import { DigitView } from "./DigitalHuman/DigitView"
 import LinearGradient from "react-native-linear-gradient"
 import Icon from "react-native-vector-icons/Ionicons"
-
+import UserEval from "./DigitalHuman/UserEval"
+import Admin from "./DigitalHuman/Admin"
 const { width, height } = Dimensions.get("window")
-
 const DigitalHumanScreen = ({ navigation }) => {
   const [isConnected, setIsConnected] = useState(false)
   const [sessionId, setSessionId] = useState(null)
@@ -35,9 +35,12 @@ const DigitalHumanScreen = ({ navigation }) => {
   const [remoteAudioStream, setRemoteAudioStream] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showChat, setShowChat] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [isAdmin, setIsAdmin] = useState(false)
   const pcRef = useRef(null)
   const videoRef = useRef(null)
   const audioRef = useRef(null)
+  const chatRef = useRef(null)
 
   const mediaConstraints = {
     audio: true,
@@ -331,8 +334,9 @@ const DigitalHumanScreen = ({ navigation }) => {
       if (pc.connectionState === "connected") {
         setIsConnected(true)
         setIsLoading(false)
+        setShowChat(true)
         // 连接成功后自动显示聊天窗口
-        setTimeout(() => setShowChat(true), 500)
+        // setTimeout(() => setShowChat(true), 500)
       } else if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
         setIsConnected(false)
         setIsLoading(false)
@@ -465,8 +469,15 @@ const DigitalHumanScreen = ({ navigation }) => {
     console.log("连接已断开")
   }
 
+  const checkadmin = () => {
+    console.log("检查管理员")
+    setIsAdmin(!isAdmin)
+  }
+
   const toggleChat = () => {
-    setShowChat(!showChat)
+    console.log(chatRef.current);
+    setMessages(chatRef.current.getMessages());
+    setShowChat(!showChat);
   }
 
   return (
@@ -480,7 +491,6 @@ const DigitalHumanScreen = ({ navigation }) => {
         end={{ x: 1, y: 1 }}
         style={styles.background}
       />
-
       {/* 数字人视图 - 占据全屏 */}
       <View style={styles.digitViewContainer}>
         <DigitView
@@ -497,12 +507,20 @@ const DigitalHumanScreen = ({ navigation }) => {
           <Icon name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>康复治疗师</Text>
+
+        <TouchableOpacity style={styles.adminButton} onPress={checkadmin}>
+          <Icon name="shield-checkmark-outline" size={30} color="white"/>
+        </TouchableOpacity>
+
         {isConnected && (
           <TouchableOpacity style={styles.chatToggleButton} onPress={toggleChat}>
-            <Icon name={showChat ? "chatbubble" : "chatbubble-outline"} size={24} color="#fff" />
+            <Icon name={!showChat ? "chatbubble" : "chatbubble-outline"} size={24} color="#fff" />
           </TouchableOpacity>
         )}
+        
       </SafeAreaView>
+      <Admin isAdmin={isAdmin} setIsAdmin={setIsAdmin}/>
+      <UserEval showChat={showChat} isConnected={isConnected} messages={messages} setShowChat={setShowChat} style={styles.chatToggleButton}/>
 
       {/* 底部控制区域 */}
       <View style={styles.bottomContainer}>
@@ -533,7 +551,12 @@ const DigitalHumanScreen = ({ navigation }) => {
       {/* 聊天视图 - 仅在连接且showChat为true时显示 */}
       {isConnected && showChat && (
         <View style={styles.chatContainer}>
-          <ChatView sessionId={sessionId} isConnected={isConnected} audioStream={remoteAudioStream} />
+          <ChatView 
+            sessionId={sessionId} 
+            isConnected={isConnected} 
+            audioStream={remoteAudioStream} 
+            ref={chatRef}
+          />
         </View>
       )}
     </View>
@@ -588,7 +611,18 @@ const styles = StyleSheet.create({
   chatToggleButton: {
     position: "absolute",
     right: 20,
-    top: Platform.OS === "ios" ? 50 : StatusBar.currentHeight + 16,
+    top: 100,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  adminButton:{
+    position: "absolute",
+    right: 20,
+    top: 50,
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -611,6 +645,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 10,
   },
+  
   connectButton: {
     width: "100%",
     height: 56,

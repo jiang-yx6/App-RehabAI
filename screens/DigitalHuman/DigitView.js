@@ -2,9 +2,7 @@ import { StyleSheet, View, Dimensions, Image } from "react-native"
 import { RTCView } from "react-native-webrtc"
 import { BlurView } from "@react-native-community/blur"
 
-const { width } = Dimensions.get("window")
-const { height } = Dimensions.get("window")
-
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window")
 
 export const DigitView = ({ videoRef, isConnected, remoteStream }) => {
   return (
@@ -16,16 +14,22 @@ export const DigitView = ({ videoRef, isConnected, remoteStream }) => {
             streamURL={remoteStream.toURL()}
             objectFit="none"
             style={[styles.digitalHuman, {
-              width: width,
-              height: height,
+              width: SCREEN_WIDTH,
+              height: SCREEN_HEIGHT,
               transform: [
                 { scale: 4 },
-                { translateX: width * 0.1 },
+                { translateX: SCREEN_WIDTH * 0.1 },
               ]
             }]}
           />
         ) : (
-          <Image source={require("../../assets/doctor.jpg")} style={styles.digitalHuman} />
+          <Image 
+            source={require("../../assets/doctor.jpg")} 
+            style={styles.placeholderImage}
+            resizeMode="cover"
+            onError={(error) => console.log('Image loading error:', error)}
+            onLoad={() => console.log('Image loaded successfully')}
+          />
         )}
       </BlurView>
     </View>
@@ -39,13 +43,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   blurView: {
     width: "100%",
     height: "100%",
     overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
   },
   digitalHuman: {
     flex: 1,
+  },
+  placeholderImage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    alignSelf: 'center',
   },
 })

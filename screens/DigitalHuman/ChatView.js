@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react"
 import {
   StyleSheet,
   View,
@@ -17,12 +17,22 @@ import {
 import Microphone from "./Microphone"
 import Icon from "react-native-vector-icons/Ionicons"
 import TypingIndicator from "../utils/TypingIndicator"
-
 const { width, height } = Dimensions.get("window")
 
-const ChatView = ({ sessionId, isConnected, audioStream }) => {
+const ChatView = forwardRef(({ sessionId, isConnected, audioStream }, ref) => {
   const [input, setInput] = useState("") // 输入框内容
-  const [messages, setMessages] = useState([]) // 聊天内容
+  const [messages, setMessages] = useState([
+    // {
+    //   id: 1,
+    //   text: "你好，我是小明，很高兴认识你。",
+    //   isUser: false,
+    // },
+    // {
+    //   id: 2,
+    //   text: "你好，我是小明，很高兴认识你。",
+    //   isUser: true,
+    // },
+  ]) // 聊天内容
   const [isLoading, setIsLoading] = useState(false) // 是否正在加载
   const [isExpanded, setIsExpanded] = useState(false) // 聊天内容是否展开
   const [micStatus, setMicStatus] = useState("")
@@ -127,7 +137,11 @@ const ChatView = ({ sessionId, isConnected, audioStream }) => {
     }
   }, [isStreaming, streamIndex, fullText])
 
-  // 开始流式输出
+  // 暴露方法给父组件
+  useImperativeHandle(ref, () => ({
+    getMessages: () => messages
+  }));
+
   const startStreaming = (text) => {
     // 清除之前的流式输出
     if (streamTimerRef.current) {
@@ -252,11 +266,11 @@ const ChatView = ({ sessionId, isConnected, audioStream }) => {
   return (
     <View style={styles.container}>
       {/* 状态提示 */}
-      {showMicStatus && (
+      {/* {showMicStatus && (
         <Animated.View style={[styles.statusOverlay, { opacity: statusOpacity }]}>
           <Text style={styles.statusText}>{micStatus}</Text>
         </Animated.View>
-      )}
+      )} */}
 
       {/* 展开/收起按钮 */}
       <TouchableOpacity style={styles.expandButton} onPress={toggleExpand}>
@@ -313,7 +327,7 @@ const ChatView = ({ sessionId, isConnected, audioStream }) => {
       </View>
     </View>
   )
-}
+})
 
 const styles = StyleSheet.create({
   container: {
