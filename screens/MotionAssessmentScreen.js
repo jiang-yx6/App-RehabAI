@@ -39,10 +39,15 @@ const MotionAssessmentScreen = ({ navigation }) => {
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [resultData, setResultData] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [cameraPosition, setCameraPosition] = useState("front")
 
   const cameraRef = useRef(null)
-  const device = useCameraDevice("front")
+  const device = useCameraDevice(cameraPosition)
   const { hasPermission, requestPermission } = useCameraPermission()
+
+  const handleFlipCamera = () => {
+    setCameraPosition(prev => prev === "front" ? "back" : "front")
+  }
 
   const handleSelectStandardVideo = (video) => {
     setSelectedStandardVideo(video)
@@ -319,6 +324,7 @@ const MotionAssessmentScreen = ({ navigation }) => {
         onStopRecording={stopRecording}
         onClickAtCamera={onClickAtCamera}
         onCloseCamera={() => setShowCamera(false)}
+        onFlipCamera={handleFlipCamera}
         customStyles={cameraStyles}
       />
 

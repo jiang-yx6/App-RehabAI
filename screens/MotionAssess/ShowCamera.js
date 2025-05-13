@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   Modal,
 } from "react-native";
-import { Camera } from 'react-native-vision-camera';
+import { Camera, CameraPosition } from 'react-native-vision-camera';
 import Ionicons from "react-native-vector-icons/Ionicons";
-
+ 
 const CameraControls = ({ isRecording, onStopRecording, onClose, onClickAtCamera }) => (
   <TouchableOpacity
     style={{
@@ -43,6 +43,7 @@ const ShowCamera = ({
   onStopRecording,
   onClickAtCamera,
   onCloseCamera,
+  onFlipCamera,
 }) => {
   return (
     <Modal visible={showCamera} transparent={true} animationType="slide">
@@ -59,16 +60,29 @@ const ShowCamera = ({
         )}
 
         {!isRecording && (
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={onCloseCamera}
-          >
-            <Ionicons 
-              name="arrow-back" 
-              size={25} 
-              color="white" 
-            />
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={onCloseCamera}
+            >
+              <Ionicons 
+                name="arrow-back" 
+                size={25} 
+                color="white" 
+              />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.flipButton}
+              onPress={onFlipCamera}
+            >
+              <Ionicons 
+                name="camera-reverse-outline" 
+                size={30} 
+                color="white" 
+              />
+            </TouchableOpacity>
+          </>
         )}
 
         {countdown !== null && (
@@ -109,6 +123,18 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000000,
+  },
+  flipButton: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000000,

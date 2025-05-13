@@ -19,22 +19,18 @@ import Icon from "react-native-vector-icons/Ionicons"
 import TypingIndicator from "../utils/TypingIndicator"
 const { width, height } = Dimensions.get("window")
 
-const ChatView = forwardRef(({ sessionId, isConnected, audioStream }, ref) => {
+const ChatView = forwardRef(({ 
+  sessionId, 
+  isConnected, 
+  audioStream, 
+  type = "main",
+  messages,
+  setMessages,
+  showOnlyInput = false
+}, ref) => {
   const [input, setInput] = useState("") // 输入框内容
-  const [messages, setMessages] = useState([
-    // {
-    //   id: 1,
-    //   text: "你好，我是小明，很高兴认识你。",
-    //   isUser: false,
-    // },
-    // {
-    //   id: 2,
-    //   text: "你好，我是小明，很高兴认识你。",
-    //   isUser: true,
-    // },
-  ]) // 聊天内容
   const [isLoading, setIsLoading] = useState(false) // 是否正在加载
-  const [isExpanded, setIsExpanded] = useState(false) // 聊天内容是否展开
+  const [isExpanded, setIsExpanded] = useState(type === "main") // 主聊天框默认展开
   const [micStatus, setMicStatus] = useState("")
   const [showMicStatus, setShowMicStatus] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false) // 是否正在流式输出
@@ -45,21 +41,17 @@ const ChatView = forwardRef(({ sessionId, isConnected, audioStream }, ref) => {
   const scrollViewRef = useRef(null)
   const inputRef = useRef(null)
   const streamTimerRef = useRef(null)
-  const chatContainerHeight = useRef(new Animated.Value(isExpanded ? 300 : 150)).current
+  const chatContainerHeight = useRef(new Animated.Value(type === "main" ? 300 : 150)).current
 
   useEffect(() => {
     if (audioStream) {
       console.log("Audio stream available in ChatView")
 
-      // You can create an audio element for web if needed
       if (Platform.OS === "web") {
         const audioElement = new Audio()
         audioElement.srcObject = audioStream
         audioElement.play().catch((e) => console.error("Error playing audio:", e))
       }
-
-      // For native platforms, the audio should play automatically
-      // through the RTCPeerConnection
     }
   }, [audioStream])
 
@@ -139,7 +131,19 @@ const ChatView = forwardRef(({ sessionId, isConnected, audioStream }, ref) => {
 
   // 暴露方法给父组件
   useImperativeHandle(ref, () => ({
-    getMessages: () => messages
+    getMessages: () => messages,
+    isLoading, // 暴露加载状态
+    clearMessages: () => {
+      // 清理流式输出定时器和相关状态，但不清空消息
+      if (streamTimerRef.current) {
+        clearInterval(streamTimerRef.current)
+      }
+      setFullText("")
+      setStreamIndex(0)
+      setIsStreaming(false)
+      setInput("")
+      // 不清空messages，因为这是由父组件管理的
+    }
   }));
 
   const startStreaming = (text) => {
@@ -264,64 +268,98 @@ const ChatView = forwardRef(({ sessionId, isConnected, audioStream }, ref) => {
   }, [])
 
   return (
-    <View style={styles.container}>
-      {/* 状态提示 */}
-      {/* {showMicStatus && (
-        <Animated.View style={[styles.statusOverlay, { opacity: statusOpacity }]}>
-          <Text style={styles.statusText}>{micStatus}</Text>
-        </Animated.View>
-      )} */}
-
-      {/* 展开/收起按钮 */}
-      <TouchableOpacity style={styles.expandButton} onPress={toggleExpand}>
-        <Icon name={isExpanded ? "chevron-down" : "chevron-up"} size={20} color="#3b82f6" />
-        <Text style={styles.expandButtonText}>{isExpanded ? "收起" : "展开"}</Text>
-      </TouchableOpacity>
-
-      {/* 消息列表区域 */}
-      <Animated.View style={[styles.messagesWrapper, { height: chatContainerHeight }]}>
-        <ScrollView ref={scrollViewRef} style={styles.messagesContainer} contentContainerStyle={styles.messagesContent}>
-          {messages.map((message) => (
-            <View key={message.id} style={[styles.messageBubble, message.isUser ? styles.userBubble : styles.aiBubble]}>
-              <Text style={message.isUser ? styles.userMessageText : styles.aiMessageText}>{message.text}</Text>
-              {!message.isUser &&
-                isStreaming &&
-                message.id === messages[messages.length - 1]?.id &&
-                message.text !== fullText && (
-                  <View style={styles.typingIndicatorWrapper}>
-                    <TypingIndicator />
-                  </View>
-                )}
-            </View>
-          ))}
-          {isLoading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#3b82f6" />
-              <Text style={styles.loadingText}>AI思考中...</Text>
-            </View>
+    <View style={[styles.container, type === "secondary" && styles.secondaryContainer]}>
+      {/* 只有当 showOnlyInput 为 false 时才显示以下内容 */}
+      {!showOnlyInput && (
+        <>
+          {/* 展开/收起按钮 */}
+          {type === "main" && (
+            <TouchableOpacity style={styles.expandButton} onPress={toggleExpand}>
+              <Icon name={isExpanded ? "chevron-down" : "chevron-up"} size={20} color="#3b82f6" />
+              <Text style={styles.expandButtonText}>{isExpanded ? "收起" : "展开"}</Text>
+            </TouchableOpacity>
           )}
-        </ScrollView>
-      </Animated.View>
 
-      {/* 输入区域 - 固定在底部 */}
-      <View style={styles.inputWrapper}>
+          {/* 消息列表区域 */}
+          <Animated.View 
+            style={[
+              styles.messagesWrapper, 
+              { height: type === "main" ? chatContainerHeight : 150 }
+            ]}
+          >
+            <ScrollView 
+              ref={scrollViewRef} 
+              style={styles.messagesContainer} 
+              contentContainerStyle={styles.messagesContent}
+            >
+              {messages.map((message) => (
+                <View 
+                  key={message.id} 
+                  style={[
+                    styles.messageBubble,
+                    message.isUser ? styles.userBubble : styles.aiBubble,
+                    { backgroundColor: message.isUser 
+                      ? (type === "main" ? "#3b82f6" : "#4CAF50")
+                      : (type === "main" ? "#e2e8f0" : "#f5f5f5")
+                    }
+                  ]}
+                >
+                  <Text style={[
+                    message.isUser ? styles.userMessageText : styles.aiMessageText,
+                    type === "secondary" && styles.secondaryText
+                  ]}>
+                    {message.text}
+                  </Text>
+                  {!message.isUser &&
+                    isStreaming &&
+                    message.id === messages[messages.length - 1]?.id &&
+                    message.text !== fullText && (
+                      <View style={styles.typingIndicatorWrapper}>
+                        <TypingIndicator />
+                      </View>
+                    )}
+                </View>
+              ))}
+              {isLoading && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#3b82f6" />
+                  <Text style={styles.loadingText}>AI思考中...</Text>
+                </View>
+              )}
+            </ScrollView>
+          </Animated.View>
+        </>
+      )}
+
+      {/* 输入区域 - 总是显示 */}
+      <View style={[styles.inputWrapper, type === "secondary" && styles.secondaryInputWrapper]}>
         <View style={styles.inputContainer}>
           <TextInput
             ref={inputRef}
-            style={styles.input}
+            style={[styles.input, type === "secondary" && styles.secondaryInput]}
             value={input}
             onChangeText={setInput}
-            placeholder="请输入您的问题..."
+            placeholder={type === "main" ? "请输入您的问题..." : "请输入..."}
             placeholderTextColor="#a0aec0"
             multiline={false}
           />
-          <Microphone handleVoiceInput={handleVoiceInput} onStatusChange={showStatusMessage} />
+          {type === "main" && (
+            <Microphone handleVoiceInput={handleVoiceInput} onStatusChange={showStatusMessage} />
+          )}
           <TouchableOpacity
-            style={[styles.sendButton, input.trim() === "" ? styles.sendButtonDisabled : null]}
+            style={[
+              styles.sendButton,
+              input.trim() === "" && styles.sendButtonDisabled,
+              type === "secondary" && styles.secondarySendButton
+            ]}
             onPress={handleSendMessage}
             disabled={input.trim() === ""}
           >
-            <Icon name="send" size={24} color={input.trim() === "" ? "#CBD5E0" : "white"} />
+            <Icon 
+              name="send" 
+              size={24} 
+              color={input.trim() === "" ? "#CBD5E0" : (type === "main" ? "white" : "#4CAF50")} 
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -335,6 +373,7 @@ const styles = StyleSheet.create({
     display: "flex",
     flexDirection: "column",
     position: "relative",
+    backgroundColor: (type) => type === "main" ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.85)",
   },
   statusOverlay: {
     position: "absolute",
@@ -374,7 +413,8 @@ const styles = StyleSheet.create({
   },
   messagesWrapper: {
     width: "100%",
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    backgroundColor: (type) => type === "main" ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.85)",
+    maxHeight: (type) => type === "main" ? 300 : 150,
   },
   messagesContainer: {
     flex: 1,
@@ -390,6 +430,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginVertical: 5,
     position: "relative",
+    backgroundColor: (type, isUser) => {
+      if (type === "main") {
+        return isUser ? "#3b82f6" : "#e2e8f0"
+      } else {
+        return isUser ? "#4CAF50" : "#f5f5f5"
+      }
+    },
   },
   userBubble: {
     backgroundColor: "#3b82f6",
@@ -427,7 +474,7 @@ const styles = StyleSheet.create({
     width: "100%",
     padding: 10,
     paddingBottom: Platform.OS === "ios" ? 20 : 10,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    backgroundColor: (type) => type === "main" ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.85)",
     borderTopWidth: 1,
     borderTopColor: "rgba(203, 213, 224, 0.5)",
   },
@@ -466,6 +513,24 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginLeft: 4,
     height: 16,
+  },
+  secondaryContainer: {
+    backgroundColor: "rgba(255, 255, 255, 0.85)",
+  },
+  secondaryText: {
+    fontSize: 14,
+  },
+  secondaryInputWrapper: {
+    paddingVertical: 5,
+  },
+  secondaryInput: {
+    height: 36,
+    fontSize: 14,
+  },
+  secondarySendButton: {
+    backgroundColor: "#4CAF50",
+    width: 36,
+    height: 36,
   },
 })
 

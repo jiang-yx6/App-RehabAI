@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useEffect } from "react"
+import React, { useRef, useState, useEffect } from "react"
 import {
   StyleSheet,
   View,
@@ -12,6 +12,10 @@ import {
   SafeAreaView,
   Dimensions,
   ActivityIndicator,
+  Button,
+  Alert,
+  ScrollView,
+  Animated,
 } from "react-native"
 import {
   RTCPeerConnection,
@@ -20,453 +24,143 @@ import {
   MediaStream,
   RTCAudioSession,
 } from "react-native-webrtc"
+import { useFocusEffect } from "@react-navigation/native"
 import ChatView from "./DigitalHuman/ChatView"
 import { DigitView } from "./DigitalHuman/DigitView"
 import LinearGradient from "react-native-linear-gradient"
 import Icon from "react-native-vector-icons/Ionicons"
 import UserEval from "./DigitalHuman/UserEval"
 import Admin from "./DigitalHuman/Admin"
+import WebRTCManager from "./utils/WebRTCManager"
+
 const { width, height } = Dimensions.get("window")
 const DigitalHumanScreen = ({ navigation }) => {
   const [isConnected, setIsConnected] = useState(false)
   const [sessionId, setSessionId] = useState(null)
-  const [localStream, setLocalStream] = useState(null)
   const [remoteVideoStream, setRemoteVideoStream] = useState(null)
   const [remoteAudioStream, setRemoteAudioStream] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [showChat, setShowChat] = useState(false)
+  const [isShowEval, setIsShowEval] = useState(false)
   const [messages, setMessages] = useState([])
   const [isAdmin, setIsAdmin] = useState(false)
-  const pcRef = useRef(null)
+  const [showMotionButton, setShowMotionButton] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const videoRef = useRef(null)
   const audioRef = useRef(null)
   const chatRef = useRef(null)
+  const scrollViewRef = useRef(null)
 
-  const mediaConstraints = {
-    audio: true,
-    video: {
-      frameRate: 30,
-      facingMode: "user",
-    },
-  }
-
-  const sessionConstraints = {
-    mandatory: {
-      OfferToReceiveAudio: true,
-      OfferToReceiveVideo: true,
-      VoiceActivityDetection: true,
-    },
-  }
-
-  // Handle remote audio stream changes
+  // 初始化 WebRTC 管理器
   useEffect(() => {
-    if (remoteAudioStream) {
-      console.log("Remote audio stream set")
-
-      // Enable audio tracks
-      const audioTracks = remoteAudioStream.getAudioTracks()
-      console.log(`Remote audio stream has ${audioTracks.length} audio tracks`)
-
-      audioTracks.forEach((track) => {
-        console.log(`Enabling audio track: ${track.id}`)
-        track.enabled = true
-
-        // 增加音量 - 如果 MediaStreamTrack 支持音量属性
-        if (track.getConstraints && track.applyConstraints) {
-          try {
-            // 尝试设置音量约束 (仅在某些平台支持)
-            track.applyConstraints({ volume: 1.0 })
-          } catch (e) {
-            console.log("音量约束不受支持:", e)
-          }
-        }
-
-        // Add event listeners to track audio state
-        track.onended = () => console.log(`Audio track ${track.id} ended`)
-        track.onmute = () => console.log(`Audio track ${track.id} muted`)
-        track.onunmute = () => console.log(`Audio track ${track.id} unmuted`)
-      })
-
-      // Force audio routing to speaker on Android
-      if (Platform.OS === "android") {
-        try {
-          const AudioManager = require("react-native").NativeModules.AudioManager
-          if (AudioManager && AudioManager.setSpeakerphoneOn) {
-            console.log("Setting speakerphone on")
-            AudioManager.setSpeakerphoneOn(true)
-
-            // 增加媒体音量到最大 (Android特有)
-            if (AudioManager.setStreamVolume) {
-              // 设置媒体流音量到最大 (通常是15)
-              AudioManager.setStreamVolume(3, 15, 0)
-              console.log("已将媒体音量设置为最大")
-            }
-          } else {
-            console.warn("AudioManager not available for speaker control")
-          }
-        } catch (error) {
-          console.error("Error setting audio mode:", error)
-        }
-      }
-
-      // 在iOS上设置音频会话并增加音量
-      if (Platform.OS === "ios") {
-        try {
-          const audioSession = RTCAudioSession.sharedInstance()
-          audioSession.setCategory("playAndRecord")
-          audioSession.setMode("videoChat")
-
-          // 设置音频会话的首选输出音量 (0.0 到 1.0)
-          audioSession.setOutputVolume(1.0)
-
-          // 尝试使用AVAudioSession增加音量 (如果可用)
-          const AVAudioSession = require("react-native").NativeModules.AVAudioSession
-          if (AVAudioSession && AVAudioSession.setCategory) {
-            AVAudioSession.setCategory("playAndRecord", {
-              defaultToSpeaker: true,
-              allowBluetooth: true,
-              allowBluetoothA2DP: true,
-              allowAirPlay: true,
-              mixWithOthers: true,
-            })
-          }
-
-          audioSession.setActive(true)
-          console.log("iOS音频会话已配置为最大音量")
-        } catch (error) {
-          console.error("设置iOS音频会话时出错:", error)
-        }
-      }
-
-      // 创建音频上下文并应用增益 (Web平台)
-      if (Platform.OS === "web") {
-        try {
-          // 创建音频上下文
-          const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-
-          // 创建媒体源
-          const source = audioContext.createMediaStreamSource(remoteAudioStream)
-
-          // 创建增益节点
-          const gainNode = audioContext.createGain()
-
-          // 设置增益值 (1.0是正常音量，大于1.0会增加音量)
-          gainNode.gain.value = 2.5 // 将音量增加到原来的2.5倍
-
-          // 连接节点
-          source.connect(gainNode)
-          gainNode.connect(audioContext.destination)
-
-          console.log("Web平台: 已应用音频增益")
-        } catch (error) {
-          console.error("设置Web音频增益时出错:", error)
-        }
-      }
-    }
-  }, [remoteAudioStream])
-
-  // Handle remote video stream changes
-  useEffect(() => {
-    if (remoteVideoStream) {
-      console.log("Remote video stream set")
-      const videoTracks = remoteVideoStream.getVideoTracks()
-      console.log(`Remote video stream has ${videoTracks.length} video tracks`)
-
-      videoTracks.forEach((track) => {
-        console.log(`Enabling video track: ${track.id}`)
-        track.enabled = true
-      })
-    }
-  }, [remoteVideoStream])
-
-  // Configure audio session
-  useEffect(() => {
-    if (Platform.OS === "ios") {
-      const audioSession = RTCAudioSession.sharedInstance()
-      audioSession.setCategory("playAndRecord", {
-        defaultToSpeaker: true,
-        allowBluetooth: true,
-        allowBluetoothA2DP: true,
-        allowAirPlay: true,
-        mixWithOthers: true,
-      })
-      audioSession.setMode("videoChat")
-
-      // 设置最大音量
-      audioSession.setOutputVolume(1.0)
-
-      // 尝试使用系统API增加音量
-      try {
-        const AVAudioSession = require("react-native").NativeModules.AVAudioSession
-        if (AVAudioSession && AVAudioSession.setCategory) {
-          AVAudioSession.setCategory("playAndRecord", {
-            defaultToSpeaker: true,
-            allowBluetooth: true,
-            allowBluetoothA2DP: true,
-            allowAirPlay: true,
-            mixWithOthers: true,
-          })
-        }
-      } catch (error) {
-        console.log("AVAudioSession API不可用", error)
-      }
-
-      audioSession.setActive(true)
-    } else if (Platform.OS === "android") {
-      // 在Android上设置音频模式
-      try {
-        const AudioManager = require("react-native").NativeModules.AudioManager
-        if (AudioManager) {
-          // 设置为通信模式
-          if (AudioManager.setMode) {
-            AudioManager.setMode(3) // MODE_IN_COMMUNICATION
-          }
-
-          // 打开扬声器
-          if (AudioManager.setSpeakerphoneOn) {
-            AudioManager.setSpeakerphoneOn(true)
-          }
-
-          // 设置媒体音量到最大
-          if (AudioManager.setStreamVolume) {
-            // 参数: 流类型(3=媒体), 音量(最大), 标志(0)
-            AudioManager.setStreamVolume(3, 15, 0)
-            console.log("已将媒体音量设置为最大")
-          }
-        }
-      } catch (error) {
-        console.error("设置Android音频模式时出错:", error)
-      }
-    }
-
-    return () => {
-      if (Platform.OS === "ios") {
-        const audioSession = RTCAudioSession.sharedInstance()
-        audioSession.setActive(false)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    return () => handleDisconnect()
-  }, [])
-
-  const requestPermissions = async () => {
-    if (Platform.OS === "android") {
-      try {
-        const granted = await PermissionsAndroid.requestMultiple([
-          PermissionsAndroid.PERMISSIONS.CAMERA,
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-        ])
-        return Object.values(granted).every((permission) => permission === PermissionsAndroid.RESULTS.GRANTED)
-      } catch (err) {
-        console.warn("权限请求失败:", err)
-        return false
-      }
-    }
-    return true
-  }
-
-  const getLocalStream = async () => {
-    try {
-      const stream = await mediaDevices.getUserMedia(mediaConstraints)
-      setLocalStream(stream)
-      return stream
-    } catch (err) {
-      console.error("获取本地流失败:", err)
-      throw err
-    }
-  }
-
-  const createPeerConnection = () => {
-    const config = {
-      iceServers: [
-        {
-          urls: ["stun:stun.l.google.com:19302"],
-        },
-      ],
-      sdpSemantics: "unified-plan",
-    }
-
-    const pc = new RTCPeerConnection(config)
-
-    pc.onicecandidate = ({ candidate }) => {
-      if (candidate) {
-        console.log("收到ICE候选者:", candidate)
-      }
-    }
-
-    pc.ontrack = (event) => {
-      console.log("收到远程轨道:", event.track.kind)
-
-      // Create separate streams for audio and video
-      if (event.track.kind === "audio") {
-        // Create new audio stream if it doesn't exist
-        const audioStream = remoteAudioStream || new MediaStream()
-
-        // Check if we already have this track
-        const existingTracks = audioStream.getAudioTracks()
-        const trackExists = existingTracks.some((t) => t.id === event.track.id)
-
-        if (!trackExists) {
-          console.log(`Adding audio track ${event.track.id} to audio stream`)
-          audioStream.addTrack(event.track)
-          setRemoteAudioStream(audioStream)
-        }
-      } else if (event.track.kind === "video") {
-        // Create new video stream if it doesn't exist
-        const videoStream = remoteVideoStream || new MediaStream()
-
-        // Check if we already have this track
-        const existingTracks = videoStream.getVideoTracks()
-        const trackExists = existingTracks.some((t) => t.id === event.track.id)
-
-        if (!trackExists) {
-          console.log(`Adding video track ${event.track.id} to video stream`)
-          videoStream.addTrack(event.track)
-          setRemoteVideoStream(videoStream)
-        }
-      }
-    }
-
-    pc.onconnectionstatechange = () => {
-      console.log("连接状态变化:", pc.connectionState)
-      if (pc.connectionState === "connected") {
-        setIsConnected(true)
+    WebRTCManager.initialize({
+      // 连接状态变化回调
+      onConnectionStateChange: (state, connected) => {
+        console.log(`连接状态变化: ${state}, 已连接: ${connected}`)
+        setIsConnected(connected)
         setIsLoading(false)
-        setShowChat(true)
-        // 连接成功后自动显示聊天窗口
-        // setTimeout(() => setShowChat(true), 500)
-      } else if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
-        setIsConnected(false)
-        setIsLoading(false)
-        setShowChat(false)
-      }
-    }
-
-    return pc
-  }
-
-  const negotiate = async (peerConnection) => {
-    try {
-      console.log("开始协商过程...")
-
-      // Explicitly add transceivers for audio and video
-      peerConnection.addTransceiver("video", { direction: "recvonly" })
-      peerConnection.addTransceiver("audio", { direction: "recvonly" })
-      console.log("已添加音视频接收器")
-
-      const offer = await peerConnection.createOffer(sessionConstraints)
-      await peerConnection.setLocalDescription(offer)
-      console.log("本地描述符已设置:", offer)
-
-      // 等待 ICE gathering 完成
-      await new Promise((resolve) => {
-        if (peerConnection.iceGatheringState === "complete") {
-          console.log("ICE收集已完成")
-          resolve()
-        } else {
-          console.log("等待ICE收集...")
-          const checkState = () => {
-            if (peerConnection.iceGatheringState === "complete") {
-              console.log("ICE收集完成")
-              peerConnection.removeEventListener("icegatheringstatechange", checkState)
-              resolve()
-            }
+        
+        // 如果连接断开，清理消息
+        if (!connected && state === "closed") {
+          setMessages([])
+          if (chatRef.current) {
+            chatRef.current.clearMessages()
           }
-          peerConnection.addEventListener("icegatheringstatechange", checkState)
         }
-      })
-
-      console.log("正在发送offer到服务器...")
-      const response = await fetch("http://10.3.242.26:8010/offer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sdp: peerConnection.localDescription.sdp,
-          type: peerConnection.localDescription.type,
-        }),
-      })
-
-      const answer = await response.json()
-      console.log("收到服务器应答:", answer)
-      // 从响应中获取 sessionId
-      const { sessionid: newSessionId } = answer
-      if (newSessionId) {
+      },
+      // 远程流更新回调
+      onRemoteStreamUpdate: ({ type, stream }) => {
+        if (type === "audio") {
+          setRemoteAudioStream(stream)
+        } else if (type === "video") {
+          setRemoteVideoStream(stream)
+        }
+      },
+      // 会话 ID 接收回调
+      onSessionIdReceived: (newSessionId) => {
         setSessionId(newSessionId)
-        console.log("设置新的 sessionId:", newSessionId)
-      } else {
-        console.warn("未能从服务器响应中获取 sessionId")
+      },
+      // 错误处理回调
+      onError: (error) => {
+        console.error("WebRTC 错误:", error)
+        setIsLoading(false)
       }
+    })
 
-      // Set remote description
-      const remoteDesc = new RTCSessionDescription(answer)
-      await peerConnection.setRemoteDescription(remoteDesc)
-      console.log("远程描述符设置完成，连接建立成功！")
-    } catch (error) {
-      console.error("协商失败:", error)
-      throw error
+    // 组件卸载时清理资源和消息
+    return () => {
+      WebRTCManager.cleanup()
+      setMessages([]) // 确保消息列表被清空
     }
-  }
+  }, [])
 
+  // 添加一个函数用于添加欢迎消息
+  const addWelcomeMessage = () => {
+    const welcomeMessage = {
+      id: Date.now(),
+      text: "您好，我是您的康复治疗师。有什么可以帮助您的吗？",
+      isUser: false,
+    };
+    setMessages([welcomeMessage]);
+  };
+
+  // 处理连接状态变化
+  useEffect(() => {
+    if (isConnected) {
+      // 连接成功后添加欢迎消息
+      addWelcomeMessage();
+    }
+  }, [isConnected]);
+
+  // 确保消息更新后滚动到底部
+  useEffect(() => {
+    if (scrollViewRef.current && messages.length > 0) {
+      setTimeout(() => {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages]);
+
+  // 添加焦点效果，确保每次进入页面时重置消息
+  useFocusEffect(
+    React.useCallback(() => {
+      // 页面获得焦点时重置消息列表
+      setMessages([])
+      // 如果ChatView组件已挂载，调用其清理方法
+      if (chatRef.current) {
+        chatRef.current.clearMessages()
+      }
+      
+      // 返回的函数会在页面失去焦点时执行
+      return () => {
+        // 页面离开时的清理工作
+        setMessages([])
+        if (chatRef.current) {
+          chatRef.current.clearMessages()
+        }
+      }
+    }, [])
+  )
+
+  // 连接数字人
   const handleConnection = async () => {
     try {
       setIsLoading(true)
       console.log("开始建立连接...")
-
-      const hasPermissions = await requestPermissions()
-      if (!hasPermissions) {
-        console.log("权限请求失败")
-        setIsLoading(false)
-        return
-      } else {
-        console.log("权限请求成功")
-      }
-
-      const stream = await getLocalStream()
-      const pc = createPeerConnection()
-
-      stream.getTracks().forEach((track) => {
-        pc.addTrack(track, stream)
-      })
-
-      pcRef.current = pc
-      await negotiate(pc)
+      await WebRTCManager.connect()
     } catch (error) {
       console.error("连接失败:", error)
       setIsLoading(false)
-      handleDisconnect()
     }
   }
 
+  // 断开连接
   const handleDisconnect = () => {
-    if (localStream) {
-      localStream.getTracks().forEach((track) => track.stop())
-      setLocalStream(null)
+    WebRTCManager.disconnect()
+    // 断开连接时清空消息
+    setMessages([])
+    if (chatRef.current) {
+      chatRef.current.clearMessages()
     }
-
-    // Clean up both streams
-    if (remoteAudioStream) {
-      remoteAudioStream.getTracks().forEach((track) => track.stop())
-      setRemoteAudioStream(null)
-    }
-
-    if (remoteVideoStream) {
-      remoteVideoStream.getTracks().forEach((track) => track.stop())
-      setRemoteVideoStream(null)
-    }
-
-    if (pcRef.current) {
-      pcRef.current.close()
-      pcRef.current = null
-    }
-
-    setIsConnected(false)
-    setSessionId(null)
-    setShowChat(false)
-    console.log("连接已断开")
   }
 
   const checkadmin = () => {
@@ -474,10 +168,45 @@ const DigitalHumanScreen = ({ navigation }) => {
     setIsAdmin(!isAdmin)
   }
 
+  // 发送动作评估消息的函数
+  const sendMotionAssessMessage = () => {
+    if (!isConnected) {
+      // 如果未连接，先提示用户连接
+      Alert.alert("提示", "请先连接数字人才能使用动作评估功能")
+      return
+    }
+
+    // 添加数字人消息
+    const aiMessage = {
+      id: Date.now(),
+      text: "点击动作评估，来为你评估你的康复动作吧",
+      isUser: false,
+      showMotionButton: true // 标记这条消息需要显示按钮
+    }
+    
+    // 添加消息到聊天框
+    setMessages([...messages, aiMessage]);
+    
+    // 设置显示动作按钮
+    setShowMotionButton(true)
+    
+    // 确保消息滚动到底部
+    setTimeout(() => {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }
+    }, 100);
+  }
+
   const toggleChat = () => {
     console.log(chatRef.current);
-    setMessages(chatRef.current.getMessages());
-    setShowChat(!showChat);
+    if (chatRef.current) {
+      setMessages(chatRef.current.getMessages());
+      setMessages([])
+      chatRef.current.clearMessages()
+      addWelcomeMessage()
+    }
+    setIsShowEval(!isShowEval);
   }
 
   return (
@@ -503,62 +232,121 @@ const DigitalHumanScreen = ({ navigation }) => {
 
       {/* 顶部导航栏 */}
       <SafeAreaView style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        {/* <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
+
         <Text style={styles.headerTitle}>康复治疗师</Text>
 
         <TouchableOpacity style={styles.adminButton} onPress={checkadmin}>
           <Icon name="shield-checkmark-outline" size={30} color="white"/>
         </TouchableOpacity>
 
+        {/* 动作评估按钮 */}
+        <TouchableOpacity style={styles.motionButton} onPress={sendMotionAssessMessage}>
+          <Icon name="body-outline" size={24} color="#fff" />
+        </TouchableOpacity>
+
         {isConnected && (
           <TouchableOpacity style={styles.chatToggleButton} onPress={toggleChat}>
-            <Icon name={!showChat ? "chatbubble" : "chatbubble-outline"} size={24} color="#fff" />
+            <Icon name={isShowEval ? "chatbubble" : "chatbubble-outline"} size={24} color="#fff" />
           </TouchableOpacity>
         )}
-        
       </SafeAreaView>
+      
       <Admin isAdmin={isAdmin} setIsAdmin={setIsAdmin}/>
-      <UserEval showChat={showChat} isConnected={isConnected} messages={messages} setShowChat={setShowChat} style={styles.chatToggleButton}/>
+      <UserEval isShowEval={isShowEval} isConnected={isConnected} messages={messages} setIsShowEval={setIsShowEval} style={styles.chatToggleButton}/>
 
-      {/* 底部控制区域 */}
-      <View style={styles.bottomContainer}>
-        {/* 连接按钮 - 未连接时显示 */}
-        {!isConnected && !isLoading && (
-          <TouchableOpacity style={styles.connectButton} onPress={handleConnection}>
-            <LinearGradient
-              colors={["#4cc9f0", "#4361ee"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.connectButtonGradient}
-            >
-              <Icon name="link" size={20} color="#fff" style={styles.buttonIcon} />
-              <Text style={styles.connectButtonText}>{sessionId ? "重新连接" : "连接数字人"}</Text>
-            </LinearGradient>
+      {/* 聊天视图 - 始终显示 */}
+      <View style={[styles.chatContainer]}>
+        <View style={styles.chatViewContainer}>
+          {/* 展开/收起按钮 */}
+          <TouchableOpacity style={styles.expandButton} onPress={() => setIsExpanded(!isExpanded)}>
+            <Icon name={isExpanded ? "chevron-down" : "chevron-up"} size={20} color="#3b82f6" />
+            <Text style={styles.expandButtonText}>{isExpanded ? "收起" : "展开"}</Text>
           </TouchableOpacity>
-        )}
 
-        {/* 加载指示器 */}
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#fff" />
-            <Text style={styles.loadingText}>正在连接...</Text>
+          {/* 消息列表区域 */}
+          <Animated.View style={[styles.messagesWrapper, { height: isExpanded ? 300 : 0 }]}>
+            <ScrollView 
+              ref={scrollViewRef} 
+              style={styles.messagesContainer} 
+              contentContainerStyle={styles.messagesContent}
+            >
+              {messages.map((message) => (
+                <View key={message.id}>
+                  <View style={[styles.messageBubble, message.isUser ? styles.userBubble : styles.aiBubble]}>
+                    <Text style={message.isUser ? styles.userMessageText : styles.aiMessageText}>{message.text}</Text>
+                  </View>
+                  {!message.isUser && message.showMotionButton && (
+                    <TouchableOpacity 
+                      style={styles.motionAssessButton}
+                      onPress={() => navigation.navigate('MotionAssessment')}
+                    >
+                      <LinearGradient
+                        colors={["#4cc9f0", "#4361ee"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.motionButtonGradient}
+                      >
+                        <Icon name="body-outline" size={16} color="#fff" style={styles.buttonIcon} />
+                        <Text style={styles.motionButtonText}>开始动作评估</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+          </Animated.View>
+
+          {/* 输入区域或连接按钮 - 固定在底部 */}
+          <View style={styles.inputWrapper}>
+            {isConnected ? (
+              <>
+                {/* 加载状态指示器 - 独立显示在 ChatView 上方
+                {chatRef.current?.isLoading && (
+                  <View style={styles.loadingIndicator}>
+                    <ActivityIndicator size="small" color="#3b82f6" />
+                    <Text style={styles.loadingIndicatorText}>AI思考中...</Text>
+                  </View>
+                )} */}
+                <ChatView 
+                  sessionId={sessionId} 
+                  isConnected={isConnected} 
+                  audioStream={remoteAudioStream} 
+                  showMotionButton={showMotionButton}
+                  navigation={navigation}
+                  messages={messages}
+                  setMessages={setMessages}
+                  ref={chatRef}
+                  showOnlyInput={true}
+                />
+              </>
+            ) : (
+              <View style={styles.connectButtonWrapper}>
+                {!isLoading ? (
+                  <TouchableOpacity style={styles.connectButton} onPress={handleConnection}>
+                    <LinearGradient
+                      colors={["#4cc9f0", "#4361ee"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.connectButtonGradient}
+                    >
+                      <Icon name="link" size={20} color="#fff" style={styles.buttonIcon} />
+                      <Text style={styles.connectButtonText}>{sessionId ? "重新连接" : "连接数字人"}</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#3b82f6" />
+                    <Text style={styles.loadingText}>正在连接...</Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
-        )}
-      </View>
-
-      {/* 聊天视图 - 仅在连接且showChat为true时显示 */}
-      {isConnected && showChat && (
-        <View style={styles.chatContainer}>
-          <ChatView 
-            sessionId={sessionId} 
-            isConnected={isConnected} 
-            audioStream={remoteAudioStream} 
-            ref={chatRef}
-          />
         </View>
-      )}
+      </View>
     </View>
   )
 }
@@ -701,6 +489,173 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 5,
     elevation: 10,
+  },
+  motionButton: {
+    position: "absolute",
+    left: 30,
+    top: Platform.OS === "ios" ? 50 : StatusBar.currentHeight + 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 20,
+  },
+  chatHidden: {
+    display: 'none',
+  },
+  chatViewContainer: {
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    position: "relative",
+  },
+  expandButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(203, 213, 224, 0.5)",
+  },
+  expandButtonText: {
+    marginLeft: 5,
+    color: "#3b82f6",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  messagesWrapper: {
+    width: "100%",
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+  },
+  messagesContainer: {
+    flex: 1,
+    width: "100%",
+  },
+  messagesContent: {
+    padding: 10,
+    paddingBottom: 15,
+  },
+  messageBubble: {
+    maxWidth: "80%",
+    padding: 12,
+    borderRadius: 18,
+    marginVertical: 5,
+    position: "relative",
+  },
+  userBubble: {
+    backgroundColor: "#3b82f6",
+    alignSelf: "flex-end",
+    borderTopRightRadius: 4,
+  },
+  aiBubble: {
+    backgroundColor: "#e2e8f0",
+    alignSelf: "flex-start",
+    borderTopLeftRadius: 4,
+  },
+  userMessageText: {
+    fontSize: 16,
+    color: "white",
+  },
+  aiMessageText: {
+    fontSize: 16,
+    color: "#334155",
+  },
+  inputWrapper: {
+    width: "100%",
+    padding: 10,
+    paddingBottom: Platform.OS === "ios" ? 20 : 10,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(203, 213, 224, 0.5)",
+  },
+  connectButtonWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  connectButton: {
+    width: "100%",
+    height: 50,
+    borderRadius: 25,
+    overflow: "hidden",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  connectButtonGradient: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  connectButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
+    paddingVertical: 15,
+    paddingHorizontal: 25,
+    borderRadius: 25,
+    width: "100%",
+  },
+  loadingText: {
+    color: "#3b82f6",
+    marginLeft: 10,
+    fontSize: 16,
+  },
+  motionAssessButton: {
+    alignSelf: "flex-start",
+    marginTop: 8,
+    marginLeft: 12,
+    borderRadius: 20,
+    overflow: "hidden",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+  },
+  motionButtonGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  motionButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  loadingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(226, 232, 240, 0.8)",
+    padding: 6,
+    borderRadius: 15,
+    marginBottom: 8,
+    alignSelf: "center",
+  },
+  loadingIndicatorText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#64748b",
   },
 })
 

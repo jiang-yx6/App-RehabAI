@@ -14,23 +14,15 @@ export default function App() {
     <NavigationContainer>
       <StatusBar barStyle="dark-content" backgroundColor="#f0f8ff" />
       <Stack.Navigator
-        initialRouteName="Home"
+        initialRouteName="DigitalHuman"
         screenOptions={{
-            // headerStyle: {
-            //     backgroundColor: "#3b82f6",
-            //     },
-            // headerTintColor: "#fff",
-            // headerTitleStyle: {
-            //         fontWeight: "bold",
-            //       },
-            // cardStyle: { backgroundColor: "#f0f8ff" },
             headerShown: false
        }}
       >
-        <Stack.Screen name="Home" component={HomeScreen} options={{ title: "康复医疗AI系统" }} />
+        {/* <Stack.Screen name="Home" component={HomeScreen} options={{ title: "康复医疗AI系统" }} /> */}
         <Stack.Screen name="DigitalHuman" component={DigitalHumanScreen} options={{ title: "数字人交互" }} />
         <Stack.Screen name="MotionAssessment" component={MotionAssessmentScreen} options={{ title: "动作评估" }} />
-        <Stack.Screen name="Recorder" component={RealtimeSpeechRecognition} options={{ title: "语音Test" }}/>
+        {/* <Stack.Screen name="Recorder" component={RealtimeSpeechRecognition} options={{ title: "语音Test" }}/> */}
         
       </Stack.Navigator>
     </NavigationContainer>
