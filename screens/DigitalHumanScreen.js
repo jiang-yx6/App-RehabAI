@@ -34,6 +34,7 @@ import Admin from "./DigitalHuman/Admin"
 import WebRTCManager from "./utils/WebRTCManager"
 
 const { width, height } = Dimensions.get("window")
+const ChooseVideoTypes = ["肩", "桡骨", "膝", "踝", "俯卧撑","康复操"]
 const DigitalHumanScreen = ({ navigation }) => {
   const [isConnected, setIsConnected] = useState(false)
   const [sessionId, setSessionId] = useState(null)
@@ -45,7 +46,11 @@ const DigitalHumanScreen = ({ navigation }) => {
   const [isAdmin, setIsAdmin] = useState(false)
   const [showMotionButton, setShowMotionButton] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [showTypesButtons, setShowTypesButtons] = useState(false)
+  const [selectedBodyPart, setSelectedBodyPart] = useState(null)
+  const [shouldClearMessages, setShouldClearMessages] = useState(true)
   const videoRef = useRef(null)
+  const typeRef = useRef(null)
   const audioRef = useRef(null)
   const chatRef = useRef(null)
   const scrollViewRef = useRef(null)
@@ -120,25 +125,31 @@ const DigitalHumanScreen = ({ navigation }) => {
     }
   }, [messages]);
 
-  // 添加焦点效果，确保每次进入页面时重置消息
+  // 修改 useFocusEffect，仅在 shouldClearMessages 为 true 时清空消息
   useFocusEffect(
     React.useCallback(() => {
-      // 页面获得焦点时重置消息列表
-      setMessages([])
-      // 如果ChatView组件已挂载，调用其清理方法
-      if (chatRef.current) {
-        chatRef.current.clearMessages()
+      if (shouldClearMessages) {
+        // 页面获得焦点时重置消息列表
+        setMessages([])
+        // 如果ChatView组件已挂载，调用其清理方法
+        if (chatRef.current) {
+          chatRef.current.clearMessages()
+        }
+        
+        // 如果已连接，添加欢迎消息
+        if (isConnected) {
+          addWelcomeMessage()
+        }
+        
+        // 重置标志，避免下次自动清空
+        setShouldClearMessages(false)
       }
       
       // 返回的函数会在页面失去焦点时执行
       return () => {
-        // 页面离开时的清理工作
-        setMessages([])
-        if (chatRef.current) {
-          chatRef.current.clearMessages()
-        }
+        // 不再在页面离开时清空消息
       }
-    }, [])
+    }, [shouldClearMessages, isConnected])
   )
 
   // 连接数字人
@@ -152,7 +163,6 @@ const DigitalHumanScreen = ({ navigation }) => {
       setIsLoading(false)
     }
   }
-
   // 断开连接
   const handleDisconnect = () => {
     WebRTCManager.disconnect()
@@ -170,11 +180,11 @@ const DigitalHumanScreen = ({ navigation }) => {
 
   // 发送动作评估消息的函数
   const sendMotionAssessMessage = () => {
-    if (!isConnected) {
-      // 如果未连接，先提示用户连接
-      Alert.alert("提示", "请先连接数字人才能使用动作评估功能")
-      return
-    }
+    // if (!isConnected) {
+    //   // 如果未连接，先提示用户连接
+    //   Alert.alert("提示", "请先连接数字人才能使用动作评估功能")
+    //   return
+    // }
 
     // 添加数字人消息
     const aiMessage = {
@@ -197,6 +207,125 @@ const DigitalHumanScreen = ({ navigation }) => {
       }
     }, 100);
   }
+  
+  // 添加动作评估介绍消息
+  const UserChooseVideo = () => {
+    const introMessage = {
+      id: Date.now(),
+      text: "动作评估能帮助您评估康复动作的准确性，为您提供专业的康复建议。",
+      isUser: false,
+    }
+    
+    // 添加消息到聊天框
+    setMessages([...messages, introMessage]);
+    
+    // 添加一个临时的"正在输入"消息
+    const typingMessage = {
+      id: Date.now() + 50,
+      text: "",
+      isUser: false,
+      isTyping: true // 标记为正在输入状态
+    }
+    
+    // 先显示"正在输入"状态
+    setTimeout(() => {
+      setMessages(prevMessages => [...prevMessages, typingMessage]);
+      
+      // 确保消息滚动到底部
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollToEnd({ animated: true });
+        }
+      }, 100);
+      
+      // 模拟数字人思考后，替换为正式消息
+      setTimeout(() => {
+        // 然后添加请选择部位的消息
+        const selectPartMessage = {
+          id: Date.now() + 100,
+          text: "请选择您想要评估的身体部位：",
+          isUser: false,
+          showTypeButtons: true // 标记这条消息需要显示类型按钮
+        }
+        
+        // 替换"正在输入"消息为正式消息
+        setMessages(prevMessages => {
+          // 移除最后一条"正在输入"消息
+          const updatedMessages = prevMessages.filter(msg => !msg.isTyping);
+          // 添加新消息
+          return [...updatedMessages, selectPartMessage];
+        });
+        
+        // 显示类型按钮
+        setShowMotionButton(false)
+        setShowTypesButtons(true)
+        
+        // 确保消息滚动到底部
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollToEnd({ animated: true });
+          }
+        }, 100);
+      }, 1500); // 延迟1.5秒，模拟思考时间
+    }, 500); // 延迟0.5秒，增强真实感
+  }
+  
+  // 处理选择特定部位的函数
+  const handleSelectBodyPart = (type) => {
+    // 设置选中的部位
+    setSelectedBodyPart(type);
+    typeRef.current = type;
+    console.log("typeRef.current is:", typeRef.current)
+    // 添加用户选择的消息
+    const userSelectMessage = {
+      id: Date.now(),
+      text: `我想评估${type}部位的动作`,
+      isUser: true,
+    }
+    
+    // 添加消息到聊天框
+    setMessages(prevMessages => [...prevMessages, userSelectMessage]);
+    
+    // 隐藏类型按钮（延迟一小段时间，让用户看到选中效果）
+    setTimeout(() => {
+      setShowTypesButtons(false);
+      
+      // 模拟数字人回复
+      setTimeout(() => {
+        // 数字人确认的消息
+        const confirmMessage = {
+          id: Date.now() + 200,
+          text: `好的，我们将为您评估${type}部位的动作。请点击下方按钮开始进行评估。`,
+          isUser: false,
+          showStartButton: true // 显示开始评估按钮
+        }
+        
+        // 添加确认消息到聊天框
+        setMessages(prevMessages => [...prevMessages, confirmMessage]);
+        
+        // 重置选中状态
+        setSelectedBodyPart(null);
+        // 确保消息滚动到底部
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollToEnd({ animated: true });
+          }
+        }, 100);
+      }, 800); // 延迟0.8秒，模拟思考时间
+    }, 400); // 延迟0.4秒后隐藏选择按钮
+  }
+  
+  
+  // 导航到动作评估页面
+  const navigateToMotionAssessment = () => {
+    // 设置 shouldClearMessages 为 false，这样从评估页面返回时不会清空消息
+    setShouldClearMessages(false)
+    console.log("typeRef.current is:", typeRef.current)
+    navigation.navigate('MotionAssessment',{
+      selectedBodyPart: typeRef.current,
+    });
+    typeRef.current = null;
+  }
 
   const toggleChat = () => {
     console.log(chatRef.current);
@@ -206,6 +335,7 @@ const DigitalHumanScreen = ({ navigation }) => {
       chatRef.current.clearMessages()
       addWelcomeMessage()
     }
+    // 打开评分界面
     setIsShowEval(!isShowEval);
   }
 
@@ -278,10 +408,15 @@ const DigitalHumanScreen = ({ navigation }) => {
                   <View style={[styles.messageBubble, message.isUser ? styles.userBubble : styles.aiBubble]}>
                     <Text style={message.isUser ? styles.userMessageText : styles.aiMessageText}>{message.text}</Text>
                   </View>
+                  
+                  {/* 显示动作评估按钮 */}
                   {!message.isUser && message.showMotionButton && (
                     <TouchableOpacity 
                       style={styles.motionAssessButton}
-                      onPress={() => navigation.navigate('MotionAssessment')}
+                      onPress = {()=>{
+                        UserChooseVideo()
+                      }}
+                      // onPress={() => navigation.navigate('MotionAssessment')}
                     >
                       <LinearGradient
                         colors={["#4cc9f0", "#4361ee"]}
@@ -294,6 +429,53 @@ const DigitalHumanScreen = ({ navigation }) => {
                       </LinearGradient>
                     </TouchableOpacity>
                   )}
+                  
+                  {/* 显示身体部位类型按钮 */}
+                  {!message.isUser && message.showTypeButtons && (
+                    <View style={styles.typesButtonsContainer}>
+                      {ChooseVideoTypes.map((type) => (
+                        <TouchableOpacity 
+                          key={type} 
+                          style={[
+                            styles.typeButton,
+                            selectedBodyPart === type && styles.typeButtonSelected
+                          ]}
+                          onPress={() => handleSelectBodyPart(type)}
+                          disabled={selectedBodyPart !== null} // 当有选中的部位时禁用所有按钮
+                        >
+                          <Text 
+                            style={[
+                              styles.typeButtonText,
+                              selectedBodyPart === type && styles.typeButtonTextSelected
+                            ]}
+                          >
+                            {type}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                  
+                  {/* 显示开始评估按钮 */}
+                  {!message.isUser && message.showStartButton && (
+                    <TouchableOpacity 
+                      style={styles.startAssessButton}
+                      onPress={navigateToMotionAssessment}
+                    >
+                      <LinearGradient
+                        colors={["#4cc9f0", "#4361ee"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.motionButtonGradient}
+                      >
+                        <Icon name="play" size={16} color="#fff" style={styles.buttonIcon} />
+                        <Text style={styles.motionButtonText}>开始进行评估</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+
+
+                  
                 </View>
               ))}
             </ScrollView>
@@ -310,17 +492,17 @@ const DigitalHumanScreen = ({ navigation }) => {
                     <Text style={styles.loadingIndicatorText}>AI思考中...</Text>
                   </View>
                 )} */}
-                <ChatView 
-                  sessionId={sessionId} 
-                  isConnected={isConnected} 
-                  audioStream={remoteAudioStream} 
-                  showMotionButton={showMotionButton}
-                  navigation={navigation}
-                  messages={messages}
-                  setMessages={setMessages}
-                  ref={chatRef}
-                  showOnlyInput={true}
-                />
+              <ChatView 
+                sessionId={sessionId} 
+                isConnected={isConnected} 
+                audioStream={remoteAudioStream} 
+                showMotionButton={showMotionButton}
+                navigation={navigation}
+                messages={messages}
+                setMessages={setMessages}
+                ref={chatRef}
+                showOnlyInput={true}
+              />
               </>
             ) : (
               <View style={styles.connectButtonWrapper}>
@@ -656,6 +838,48 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 14,
     color: "#64748b",
+  },
+  typesButtonsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+    marginBottom: 5,
+    paddingHorizontal: 5,
+  },
+  typeButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: "rgba(67, 97, 238, 0.15)",
+    marginHorizontal: 4,
+    marginVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(67, 97, 238, 0.3)",
+  },
+  typeButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#3b82f6",
+  },
+  startAssessButton: {
+    alignSelf: "flex-start",
+    marginTop: 8,
+    marginLeft: 12,
+    borderRadius: 20,
+    overflow: "hidden",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+  },
+  typeButtonSelected: {
+    backgroundColor: "rgba(67, 97, 238, 0.3)",
+  },
+  typeButtonTextSelected: {
+    fontWeight: "bold",
   },
 })
 
