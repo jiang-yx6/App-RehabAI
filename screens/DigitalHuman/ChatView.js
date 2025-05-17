@@ -180,7 +180,7 @@ const ChatView = forwardRef(({
     console.log("发送给服务器的文本：", input.trim())
 
     try {
-      const response = await fetch("http://10.3.242.26:8010/human", {
+      const response = await fetch("http://10.3.242.27:8010/human", {
         body: JSON.stringify({
           text: input.trim(),
           type: "chat",
@@ -188,7 +188,7 @@ const ChatView = forwardRef(({
           sessionid: sessionId,
         }),
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
         method: "POST",
       })

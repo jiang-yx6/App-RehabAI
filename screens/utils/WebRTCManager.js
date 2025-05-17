@@ -35,7 +35,7 @@ class WebRTCManager {
         VoiceActivityDetection: true,
       },
     }
-    this.serverUrl = "http://10.3.242.26:8010/offer"
+    this.serverUrl = "http://10.3.242.27:8010/offer"
   }
 
   // 初始化 WebRTC 相关配置
