@@ -73,7 +73,7 @@ const ChatView = ({sessionId, isConnected, clickConnection, audioStream}) => {
       setInput("")
       setIsLoading(true)
 
-      const response = await fetch('http://10.3.242.26:8010/human', {
+      const response = await fetch('http://10.3.242.27:8010/human', {
         body: JSON.stringify({
           text: input.trim(),
           type: 'chat',

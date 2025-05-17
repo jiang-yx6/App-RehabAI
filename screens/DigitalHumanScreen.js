@@ -127,6 +127,90 @@ const DigitalHumanScreen = () => {
     }
   }
 
+  const handleAudioTrack = (track) => {
+    console.log("处理音频轨道:", track.id);
+    
+    // 创建新的音频流或使用现有的
+    const audioStream = remoteAudioStream || new MediaStream();
+    
+    // 检查轨道是否已存在
+    const existingTracks = audioStream.getAudioTracks();
+    const trackExists = existingTracks.some((t) => t.id === track.id);
+    
+    if (!trackExists) {
+      // 设置音频处理优先级和属性
+      if (track.applyConstraints) {
+        console.log("应用音频轨道约束");
+        try {
+          track.applyConstraints({
+            echoCancellation: false, // 关闭回声消除，减少处理负担
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleSize: 16,
+            channelCount: 1
+          });
+        } catch (e) {
+          console.warn("无法应用音频约束:", e);
+        }
+      }
+      
+      // 提高音频轨道优先级
+      track.enabled = true;
+      audioStream.addTrack(track);
+      setRemoteAudioStream(audioStream);
+      
+      // 应用增强音频设置
+      enhanceAudioOutput(audioStream);
+    }
+  };
+
+  const enhanceAudioOutput = (audioStream) => {
+    if (!audioStream) return;
+    
+    const audioTracks = audioStream.getAudioTracks();
+    console.log(`音频流有 ${audioTracks.length} 个音轨`);
+    
+    audioTracks.forEach((track) => {
+      console.log(`启用音轨: ${track.id}`);
+      track.enabled = true;
+      
+      // 设置高优先级
+      if (track.contentHint) {
+        track.contentHint = "speech";
+      }
+    });
+    
+    // Android平台特定优化
+    if (Platform.OS === "android") {
+      try {
+        const AudioManager = require("react-native").NativeModules.AudioManager;
+        if (AudioManager) {
+          // 设置音频模式为语音通话模式
+          if (AudioManager.setMode) {
+            AudioManager.setMode(3); // MODE_IN_COMMUNICATION
+          }
+          
+          // 打开扬声器
+          if (AudioManager.setSpeakerphoneOn) {
+            AudioManager.setSpeakerphoneOn(true);
+          }
+          
+          // 增加音频缓冲区大小，减少卡顿
+          if (AudioManager.setParameters) {
+            AudioManager.setParameters("audio_hw_buffer_size=4096;audio_hw_buffer_count=8");
+          }
+          
+          // 设置音频流类型和音量
+          if (AudioManager.setStreamVolume) {
+            AudioManager.setStreamVolume(3, 15, 0); // 最大音量
+          }
+        }
+      } catch (error) {
+        console.error("设置音频模式出错:", error);
+      }
+    }
+  };
+
   const createPeerConnection = () => {
     const config = {
       iceServers: [
@@ -134,44 +218,37 @@ const DigitalHumanScreen = () => {
           urls: ["stun:stun.l.google.com:19302"],
         },
       ],
+      // 优化ICE收集
+      iceTransportPolicy: "all",
+      iceCandidatePoolSize: 10,
+      // 优化SDP语义
       sdpSemantics: "unified-plan",
+      // 优化传输策略
+      bundlePolicy: "max-bundle",
+      rtcpMuxPolicy: "require"
     }
 
     const pc = new RTCPeerConnection(config)
 
     pc.onicecandidate = ({ candidate }) => {
       if (candidate) {
-        console.log("收到ICE候选者:", candidate)
+        console.log("收到ICE候选:", candidate.type)
       }
     }
 
     pc.ontrack = (event) => {
       console.log("收到远程轨道:", event.track.kind)
     
-      // Create separate streams for audio and video
       if (event.track.kind === "audio") {
-        // Create new audio stream if it doesn't exist
-        const audioStream = remoteAudioStream || new MediaStream()
-        
-        // Check if we already have this track
-        const existingTracks = audioStream.getAudioTracks()
-        const trackExists = existingTracks.some(t => t.id === event.track.id)
-        
-        if (!trackExists) {
-          console.log(`Adding audio track ${event.track.id} to audio stream`)
-          audioStream.addTrack(event.track)
-          setRemoteAudioStream(audioStream)
-        }
+        handleAudioTrack(event.track)
       } else if (event.track.kind === "video") {
-        // Create new video stream if it doesn't exist
+        // 处理视频轨道
         const videoStream = remoteVideoStream || new MediaStream()
-        
-        // Check if we already have this track
         const existingTracks = videoStream.getVideoTracks()
         const trackExists = existingTracks.some(t => t.id === event.track.id)
         
         if (!trackExists) {
-          console.log(`Adding video track ${event.track.id} to video stream`)
+          console.log(`添加视频轨道 ${event.track.id}`)
           videoStream.addTrack(event.track)
           setRemoteVideoStream(videoStream)
         }
@@ -182,8 +259,30 @@ const DigitalHumanScreen = () => {
       console.log("连接状态变化:", pc.connectionState)
       if (pc.connectionState === "connected") {
         setIsConnected(true)
+        
+        // 连接成功后设置音频输出增强
+        setTimeout(() => {
+          if (remoteAudioStream) {
+            enhanceAudioOutput(remoteAudioStream)
+          }
+        }, 500)
       } else if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
         setIsConnected(false)
+      }
+    }
+
+    // 添加ICE连接状态变化处理
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE连接状态:", pc.iceConnectionState)
+      
+      // 如果ICE连接成功但有问题，尝试重启ICE
+      if (pc.iceConnectionState === "disconnected") {
+        console.log("ICE连接断开，尝试重启...")
+        try {
+          pc.restartIce()
+        } catch (error) {
+          console.error("ICE重启失败:", error)
+        }
       }
     }
 
@@ -192,62 +291,88 @@ const DigitalHumanScreen = () => {
 
   const negotiate = async (peerConnection) => {
     try {
-      console.log("开始协商过程...")
-
-      // Explicitly add transceivers for audio and video
-      peerConnection.addTransceiver("video", { direction: "recvonly" })
-      peerConnection.addTransceiver("audio", { direction: "recvonly" })
-      console.log("已添加音视频接收器")
-
-      const offer = await peerConnection.createOffer(sessionConstraints)
+      console.log("开始协商...")
+      
+      // 明确添加仅接收的收发器
+      peerConnection.addTransceiver("video", { 
+        direction: "recvonly",
+        streams: [] 
+      })
+      peerConnection.addTransceiver("audio", { 
+        direction: "recvonly", 
+        streams: [] 
+      })
+      
+      // 创建并设置本地描述
+      const offer = await peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+        voiceActivityDetection: false, // 禁用语音活动检测，减少处理
+        iceRestart: true // 允许ICE重启
+      })
+      
+      // 修改SDP，优化音频设置
+      let sdp = offer.sdp
+      
+      // 增加音频优先级
+      sdp = sdp.replace(/a=mid:audio\r\n/g, 'a=mid:audio\r\na=priority:high\r\n')
+      
+      // 设置更适合实时通信的音频编解码器优先级
+      sdp = sdp.replace(/a=rtpmap:(.*) opus\/48000\/2/g, 
+        'a=rtpmap:$1 opus/48000/2\r\na=fmtp:$1 minptime=10;useinbandfec=1;stereo=0;sprop-stereo=0;cbr=1')
+      
+      // 禁用视频高比特率，节省资源
+      sdp = sdp.replace(/a=rtpmap:(.*) H264\/.*\r\n/g, 
+        'a=rtpmap:$1 H264/90000\r\na=fmtp:$1 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f;x-google-max-bitrate=1000;x-google-min-bitrate=500;x-google-start-bitrate=800\r\n')
+      
+      offer.sdp = sdp
+      
       await peerConnection.setLocalDescription(offer)
-      console.log("本地描述符已设置:", offer)
-
-      // 等待 ICE gathering 完成
+      console.log("已设置本地描述...")
+      
+      // 等待ICE收集完成
       await new Promise((resolve) => {
         if (peerConnection.iceGatheringState === "complete") {
-          console.log("ICE收集已完成")
           resolve()
-        } else {
-          console.log("等待ICE收集...")
-          const checkState = () => {
-            if (peerConnection.iceGatheringState === "complete") {
-              console.log("ICE收集完成")
-              peerConnection.removeEventListener("icegatheringstatechange", checkState)
-              resolve()
-            }
-          }
-          peerConnection.addEventListener("icegatheringstatechange", checkState)
+          return
         }
+        
+        const checkState = () => {
+          if (peerConnection.iceGatheringState === "complete") {
+            peerConnection.removeEventListener("icegatheringstatechange", checkState)
+            resolve()
+          }
+        }
+        
+        peerConnection.addEventListener("icegatheringstatechange", checkState)
+        
+        // 设置超时，避免卡住
+        setTimeout(() => {
+          peerConnection.removeEventListener("icegatheringstatechange", checkState)
+          resolve()
+        }, 5000) // 5秒后超时
       })
-
-      console.log("正在发送offer到服务器...")
-      const response = await fetch("http://10.3.242.26:8010/offer", {
+      
+      // 发送Offer到服务器
+      const response = await fetch("http://10.3.242.27:8010/offer", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sdp: peerConnection.localDescription.sdp,
           type: peerConnection.localDescription.type,
         }),
       })
-
+      
       const answer = await response.json()
-      console.log("收到服务器应答:", answer)
-      // 从响应中获取 sessionId
       const { sessionid: newSessionId } = answer
       if (newSessionId) {
         setSessionId(newSessionId)
-        console.log("设置新的 sessionId:", newSessionId)
-      } else {
-        console.warn("未能从服务器响应中获取 sessionId")
       }
-
-      // Set remote description
+      
+      // 设置远程描述
       const remoteDesc = new RTCSessionDescription(answer)
       await peerConnection.setRemoteDescription(remoteDesc)
-      console.log("远程描述符设置完成，连接建立成功！")
+      console.log("远程描述设置完成")
     } catch (error) {
       console.error("协商失败:", error)
       throw error
