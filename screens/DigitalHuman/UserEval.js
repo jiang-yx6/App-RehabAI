@@ -11,6 +11,11 @@ import Icon from "react-native-vector-icons/Ionicons"
 const API_BASE_URL = "https://yfvideo.hf.free4inno.com"
 const { width, height } = Dimensions.get("window")
 
+// 添加响应式设计辅助函数
+const normalize = (size) => {
+  return Math.round(size * Math.min(width / 375, height / 812))
+}
+
 const UserEval = ({isShowEval, isConnected, setIsShowEval, messages, children}) => {
   const [rating, setRating] = useState({});
   const [showRating, setShowRating] = useState(false);
@@ -79,19 +84,19 @@ const UserEval = ({isShowEval, isConnected, setIsShowEval, messages, children}) 
         <View style={styles.ratingModalContainer}>
           <View style={styles.ratingModalContent}>
             <Text style={styles.ratingModalTitle}>请对本次对话进行评价</Text>
-            <Text style={[{fontSize:20,color:"rgba(0,0,0,0.8)"}]}>回答准确度</Text>
+            <Text style={[{fontSize: normalize(20), color:"rgba(0,0,0,0.8)"}]}>回答准确度</Text>
             <View style={styles.ratingContainer}>
               {[1,2,3,4,5].map((star) => (
                 <TouchableOpacity key={star} onPress={() => handleRating(star,"accuracy")} >
-                  <Icon name={star <= rating["accuracy"] ? "star" : "star-outline"} size={30} color="skyblue"/>
+                  <Icon name={star <= rating["accuracy"] ? "star" : "star-outline"} size={normalize(30)} color="skyblue"/>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={[{fontSize:20,color:"rgba(0,0,0,0.8)"}]}>回答流畅度</Text>
+            <Text style={[{fontSize: normalize(20), color:"rgba(0,0,0,0.8)"}]}>回答流畅度</Text>
             <View style={styles.ratingContainer}>
               {[1,2,3,4,5].map((star) => (
                 <TouchableOpacity key={star} onPress={() => handleRating(star,"fluency")} >
-                  <Icon name={star <= rating["fluency"] ? "star" : "star-outline"} size={30} color="skyblue"/>
+                  <Icon name={star <= rating["fluency"] ? "star" : "star-outline"} size={normalize(30)} color="skyblue"/>
                 </TouchableOpacity>
               ))}
             </View>
@@ -120,15 +125,15 @@ const UserEval = ({isShowEval, isConnected, setIsShowEval, messages, children}) 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: height * 0.6 + 20, // 位于主聊天窗口上方
+    bottom: height * 0.6 + height * 0.02, // 位于主聊天窗口上方
     left: 0,
     right: 0,
     zIndex: 30,
   },
   chatContainer: {
-    margin: 10,
+    margin: width * 0.025,
     backgroundColor: "rgba(255, 255, 255, 0.85)",
-    borderRadius: 15,
+    borderRadius: normalize(15),
     overflow: "hidden",
     elevation: 5,
     shadowColor: "#000",
@@ -143,10 +148,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   ratingModalContent:{
-    width: "80%",
+    width: width * 0.8,
     backgroundColor: "rgb(255,255,255)",
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: normalize(20),
+    padding: width * 0.05,
     justifyContent: "space-between",
     elevation: 5,
     shadowColor: "#000",
@@ -155,31 +160,31 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
   },
   ratingModalTitle:{
-    fontSize: 20,
+    fontSize: normalize(20),
     textAlign: "center",
     fontWeight: "bold",
-    marginBottom: 20,
+    marginBottom: height * 0.02,
   },
   ratingContainer:{
     flexDirection:"row",
     justifyContent:"space-around",
-    marginVertical: 15,
+    marginVertical: height * 0.015,
   },
   ratingButtonsContainer:{
     flexDirection:"row",
     justifyContent:"space-between",
-    marginTop: 20,
+    marginTop: height * 0.02,
   },
   ratingButton:{
     backgroundColor:"#4361eed6",
-    padding: 15,
-    borderRadius: 20,
+    padding: width * 0.035,
+    borderRadius: normalize(20),
     width: "40%",
   },
   ratingButtonText:{
     color:"white",
     textAlign:"center",
-    fontSize: 16,
+    fontSize: normalize(16),
   }
 });
 

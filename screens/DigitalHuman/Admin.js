@@ -33,7 +33,7 @@ const Admin = ({isAdmin, setIsAdmin}) => {
     // 获取某个特定反馈的聊天记录
     const fetchChatMessages = async (feedbackId) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/feedback/${feedbackId}/`, {
+            const response = await fetch(`http://192.168.177.27:8000/api/feedback/${feedbackId}/`, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -41,6 +41,7 @@ const Admin = ({isAdmin, setIsAdmin}) => {
             });
             if (response.ok) {
                 const data = await response.json();
+
                 return data.messages;
             }
             return null;
@@ -52,7 +53,8 @@ const Admin = ({isAdmin, setIsAdmin}) => {
 
     const fetchChatData = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/feedback/`, {
+            // ${API_BASE_URL}/api/feedback/
+            const response = await fetch("http://192.168.177.27:8000/api/feedback/", {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -61,7 +63,10 @@ const Admin = ({isAdmin, setIsAdmin}) => {
             
             if (response.ok) {
                 const data = await response.json();
+                console.log("get data:",data)
                 setChatData(data);
+            }else{
+                console.log("error data")
             }
         } catch (error) {
             console.log("获取数据失败:", error);
@@ -407,14 +412,14 @@ const styles = StyleSheet.create({
         padding: SCREEN_WIDTH * 0.02,
     },
     loginContainer: {
-        width: Math.min(SCREEN_WIDTH * 0.9, 400),
+        width: SCREEN_WIDTH * 0.9,
         backgroundColor: 'white',
         borderRadius: 15,
         padding: SCREEN_WIDTH * 0.05,
         alignItems: 'center',
     },
     dataContainer: {
-        width: Math.min(SCREEN_WIDTH * 0.95, 1000),
+        width: SCREEN_WIDTH * 0.95,
         height: SCREEN_HEIGHT * 0.8,
         backgroundColor: 'white',
         borderRadius: 15,
@@ -435,7 +440,7 @@ const styles = StyleSheet.create({
     },
     title: {
         flex: 1,
-        fontSize: Math.min(SCREEN_WIDTH * 0.05, 20),
+        fontSize: SCREEN_WIDTH * 0.02,
         fontWeight: 'bold',
         color: '#333',
         textAlign: 'center',

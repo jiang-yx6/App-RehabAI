@@ -17,13 +17,6 @@ import {
   ScrollView,
   Animated,
 } from "react-native"
-import {
-  RTCPeerConnection,
-  mediaDevices,
-  RTCSessionDescription,
-  MediaStream,
-  RTCAudioSession,
-} from "react-native-webrtc"
 import { useFocusEffect } from "@react-navigation/native"
 import ChatView from "./DigitalHuman/ChatView"
 import { DigitView } from "./DigitalHuman/DigitView"
@@ -32,9 +25,15 @@ import Icon from "react-native-vector-icons/Ionicons"
 import UserEval from "./DigitalHuman/UserEval"
 import Admin from "./DigitalHuman/Admin"
 import WebRTCManager from "./utils/WebRTCManager"
-
+import Microphone from "./DigitalHuman/Microphone"
 const { width, height } = Dimensions.get("window")
 const ChooseVideoTypes = ["肩", "桡骨", "膝", "踝", "俯卧撑","康复操"]
+
+// 添加响应式设计辅助函数
+const normalize = (size) => {
+  return Math.round(size * Math.min(width / 375, height / 812))
+}
+
 const DigitalHumanScreen = ({ navigation }) => {
   const [isConnected, setIsConnected] = useState(false)
   const [sessionId, setSessionId] = useState(null)
@@ -338,6 +337,10 @@ const DigitalHumanScreen = ({ navigation }) => {
     // 打开评分界面
     setIsShowEval(!isShowEval);
   }
+  const handleVoiceInput = (text) => {
+    console.log("text is:", text)
+    setMessages([...messages, {id: Date.now(), text: text, isUser: true}])
+  }
 
   return (
     <View style={styles.container}>
@@ -377,11 +380,13 @@ const DigitalHumanScreen = ({ navigation }) => {
           <Icon name="body-outline" size={24} color="#fff" />
         </TouchableOpacity>
 
-        {isConnected && (
+        {!isConnected && (
           <TouchableOpacity style={styles.chatToggleButton} onPress={toggleChat}>
             <Icon name={isShowEval ? "chatbubble" : "chatbubble-outline"} size={24} color="#fff" />
           </TouchableOpacity>
         )}
+
+
       </SafeAreaView>
       
       <Admin isAdmin={isAdmin} setIsAdmin={setIsAdmin}/>
@@ -397,7 +402,7 @@ const DigitalHumanScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           {/* 消息列表区域 */}
-          <Animated.View style={[styles.messagesWrapper, { height: isExpanded ? 300 : 0 }]}>
+          <Animated.View style={[styles.messagesWrapper, { height: isExpanded ? height*0.35 : 0 }]}>
             <ScrollView 
               ref={scrollViewRef} 
               style={styles.messagesContainer} 
@@ -553,25 +558,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: Platform.OS === "ios" ? 50 : StatusBar.currentHeight + 16,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingTop: Platform.OS === "ios" ? height * 0.05 : StatusBar.currentHeight + normalize(16),
+    paddingHorizontal: width * 0.05,
+    paddingBottom: height * 0.01,
     zIndex: 10,
   },
   backButton: {
     position: "absolute",
-    left: 20,
-    top: Platform.OS === "ios" ? 50 : StatusBar.currentHeight + 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    left: width * 0.05,
+    top: Platform.OS === "ios" ? height * 0.05 : StatusBar.currentHeight + normalize(16),
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 20,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: normalize(20),
     fontWeight: "bold",
     color: "#fff",
     textShadowColor: "rgba(0, 0, 0, 0.5)",
@@ -580,25 +585,37 @@ const styles = StyleSheet.create({
   },
   chatToggleButton: {
     position: "absolute",
-    right: 20,
-    top: 100,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    right: width * 0.05,
+    top: height * 0.1,
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     justifyContent: "center",
     alignItems: "center",
   },
   adminButton:{
     position: "absolute",
-    right: 20,
-    top: 50,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    right: width * 0.05,
+    top: height * 0.05,
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  motionButton: {
+    position: "absolute",
+    left: width * 0.08,
+    top: height * 0.05,
+    width: normalize(40),
+    height: normalize(40),
+    borderRadius: normalize(20),
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 20,
   },
   digitViewContainer: {
     flex: 1,
@@ -610,16 +627,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 20,
-    paddingBottom: Platform.OS === "ios" ? 40 : 20,
+    padding: width * 0.05,
+    paddingBottom: Platform.OS === "ios" ? height * 0.04 : height * 0.02,
     alignItems: "center",
     zIndex: 10,
   },
   
   connectButton: {
     width: "100%",
-    height: 56,
-    borderRadius: 28,
+    height: normalize(56),
+    borderRadius: normalize(28),
     overflow: "hidden",
     elevation: 5,
     shadowColor: "#000",
@@ -634,11 +651,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonIcon: {
-    marginRight: 8,
+    marginRight: width * 0.02,
   },
   connectButtonText: {
     color: "white",
-    fontSize: 18,
+    fontSize: normalize(18),
     fontWeight: "bold",
   },
   loadingContainer: {
@@ -646,23 +663,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 30,
+    paddingVertical: height * 0.015,
+    paddingHorizontal: width * 0.06,
+    borderRadius: normalize(30),
   },
   loadingText: {
     color: "#fff",
-    marginLeft: 10,
-    fontSize: 16,
+    marginLeft: width * 0.025,
+    fontSize: normalize(16),
   },
   chatContainer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    maxHeight: height * 0.6, // 限制最大高度为屏幕高度的60%
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    maxHeight: height * 0.6,
+    borderTopLeftRadius: normalize(20),
+    borderTopRightRadius: normalize(20),
     overflow: "hidden",
     zIndex: 20,
     backgroundColor: "rgba(255, 255, 255, 0.55)",
@@ -672,18 +689,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 10,
   },
-  motionButton: {
-    position: "absolute",
-    left: 30,
-    top: Platform.OS === "ios" ? 50 : StatusBar.currentHeight + 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 20,
-  },
+
   chatHidden: {
     display: 'none',
   },
@@ -697,17 +703,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
+    paddingVertical: height * 0.01,
     backgroundColor: "rgba(255, 255, 255, 0.9)",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: normalize(20),
+    borderTopRightRadius: normalize(20),
     borderBottomWidth: 1,
     borderBottomColor: "rgba(203, 213, 224, 0.5)",
   },
   expandButtonText: {
-    marginLeft: 5,
+    marginLeft: width * 0.01,
     color: "#3b82f6",
-    fontSize: 14,
+    fontSize: normalize(14),
     fontWeight: "500",
   },
   messagesWrapper: {
@@ -719,38 +725,38 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   messagesContent: {
-    padding: 10,
-    paddingBottom: 15,
+    padding: width * 0.025,
+    paddingBottom: height * 0.015,
   },
   messageBubble: {
     maxWidth: "80%",
-    padding: 12,
-    borderRadius: 18,
-    marginVertical: 5,
+    padding: width * 0.03,
+    borderRadius: normalize(18),
+    marginVertical: height * 0.005,
     position: "relative",
   },
   userBubble: {
     backgroundColor: "#3b82f6",
     alignSelf: "flex-end",
-    borderTopRightRadius: 4,
+    borderTopRightRadius: normalize(4),
   },
   aiBubble: {
     backgroundColor: "#e2e8f0",
     alignSelf: "flex-start",
-    borderTopLeftRadius: 4,
+    borderTopLeftRadius: normalize(4),
   },
   userMessageText: {
-    fontSize: 16,
+    fontSize: normalize(16),
     color: "white",
   },
   aiMessageText: {
-    fontSize: 16,
+    fontSize: normalize(16),
     color: "#334155",
   },
   inputWrapper: {
     width: "100%",
-    padding: 10,
-    paddingBottom: Platform.OS === "ios" ? 20 : 10,
+    padding: width * 0.025,
+    paddingBottom: Platform.OS === "ios" ? height * 0.02 : height * 0.01,
     backgroundColor: "rgba(255, 255, 255, 0.95)",
     borderTopWidth: 1,
     borderTopColor: "rgba(203, 213, 224, 0.5)",
@@ -762,8 +768,8 @@ const styles = StyleSheet.create({
   },
   connectButton: {
     width: "100%",
-    height: 50,
-    borderRadius: 25,
+    height: normalize(50),
+    borderRadius: normalize(25),
     overflow: "hidden",
     elevation: 5,
     shadowColor: "#000",
@@ -778,11 +784,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonIcon: {
-    marginRight: 8,
+    marginRight: width * 0.02,
   },
   connectButtonText: {
     color: "white",
-    fontSize: 18,
+    fontSize: normalize(18),
     fontWeight: "bold",
   },
   loadingContainer: {
@@ -790,21 +796,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0, 0, 0, 0.1)",
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 25,
+    paddingVertical: height * 0.015,
+    paddingHorizontal: width * 0.06,
+    borderRadius: normalize(25),
     width: "100%",
   },
   loadingText: {
     color: "#3b82f6",
-    marginLeft: 10,
-    fontSize: 16,
+    marginLeft: width * 0.025,
+    fontSize: normalize(16),
   },
   motionAssessButton: {
     alignSelf: "flex-start",
-    marginTop: 8,
-    marginLeft: 12,
-    borderRadius: 20,
+    marginTop: height * 0.01,
+    marginLeft: width * 0.03,
+    borderRadius: normalize(20),
     overflow: "hidden",
     elevation: 2,
     shadowColor: "#000",
@@ -815,13 +821,13 @@ const styles = StyleSheet.create({
   motionButtonGradient: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
+    paddingVertical: height * 0.01,
+    paddingHorizontal: width * 0.035,
+    borderRadius: normalize(20),
   },
   motionButtonText: {
     color: "white",
-    fontSize: 14,
+    fontSize: normalize(14),
     fontWeight: "600",
   },
   loadingIndicator: {
@@ -829,14 +835,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(226, 232, 240, 0.8)",
-    padding: 6,
-    borderRadius: 15,
-    marginBottom: 8,
+    padding: width * 0.015,
+    borderRadius: normalize(15),
+    marginBottom: height * 0.01,
     alignSelf: "center",
   },
   loadingIndicatorText: {
-    marginLeft: 8,
-    fontSize: 14,
+    marginLeft: width * 0.02,
+    fontSize: normalize(14),
     color: "#64748b",
   },
   typesButtonsContainer: {
@@ -844,30 +850,30 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 10,
-    marginBottom: 5,
-    paddingHorizontal: 5,
+    marginTop: height * 0.01,
+    marginBottom: height * 0.005,
+    paddingHorizontal: width * 0.01,
   },
   typeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 16,
+    paddingVertical: height * 0.01,
+    paddingHorizontal: width * 0.03,
+    borderRadius: normalize(16),
     backgroundColor: "rgba(67, 97, 238, 0.15)",
-    marginHorizontal: 4,
-    marginVertical: 5,
+    marginHorizontal: width * 0.01,
+    marginVertical: height * 0.005,
     borderWidth: 1,
     borderColor: "rgba(67, 97, 238, 0.3)",
   },
   typeButtonText: {
-    fontSize: 14,
+    fontSize: normalize(14),
     fontWeight: "500",
     color: "#3b82f6",
   },
   startAssessButton: {
     alignSelf: "flex-start",
-    marginTop: 8,
-    marginLeft: 12,
-    borderRadius: 20,
+    marginTop: height * 0.01,
+    marginLeft: width * 0.03,
+    borderRadius: normalize(20),
     overflow: "hidden",
     elevation: 2,
     shadowColor: "#000",
