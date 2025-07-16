@@ -1,16 +1,22 @@
 import { NavigationContainer } from "@react-navigation/native"
 import { createStackNavigator } from "@react-navigation/stack"
-import { StatusBar} from "react-native"
+import { StatusBar,Platform} from "react-native"
 
 //Import screens
-import HomeScreen from "./screens/HomeScreen"
 import DigitalHumanScreen from "./screens/DigitalHumanScreen"
 import MotionAssessmentScreen from "./screens/MotionAssessmentScreen"
-import RealtimeSpeechRecognition from "./screens/ASR/RealtimeSpeechRecognition"
+
+import _updateConfig from "./update.json";
+const { appKey } = _updateConfig[Platform.OS];
+import { UpdateProvider, Pushy } from "react-native-update";
+const pushyClient = new Pushy({
+  appKey,
+});
 const Stack = createStackNavigator()
 
 export default function App() {
   return (
+    <UpdateProvider client={pushyClient}>
     <NavigationContainer>
       <StatusBar barStyle="dark-content" backgroundColor="#f0f8ff" />
       <Stack.Navigator
@@ -26,6 +32,7 @@ export default function App() {
         
       </Stack.Navigator>
     </NavigationContainer>
+    </UpdateProvider>
   )
 }
 

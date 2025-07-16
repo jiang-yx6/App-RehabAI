@@ -11,6 +11,7 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
+import cn.reactnative.modules.update.UpdateContext
 
 class MainApplication : Application(), ReactApplication {
 
@@ -22,6 +23,10 @@ class MainApplication : Application(), ReactApplication {
               // add(MyReactNativePackage())
             }
 
+        override fun getJSBundleFile(): String? {
+          return UpdateContext.getBundleUrl(this@MainApplication)
+        }
+        
         override fun getJSMainModuleName(): String = "index"
 
         override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG

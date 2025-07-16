@@ -12,14 +12,12 @@ import {
   StatusBar,
 } from "react-native"
 import Ionicons from "react-native-vector-icons/Ionicons"
-import LinearGradient from "react-native-linear-gradient"
 import VideoPlayer from "./VideoPlayer"
 
 const { width } = Dimensions.get("window")
 const COLUMN_WIDTH = (width - 40) / 2 // 计算两列布局的每列宽度
-
-const baseURL = "https://yfvideo.hf.free4inno.com/"
-
+import { API_BASE_URL } from "../utils/MyConfig"
+import ApiService from "../utils/ApiService"
 const ChooseVideo = ({
   selectedStandardVideo,
   userVideoRecorded,
@@ -34,15 +32,8 @@ const ChooseVideo = ({
 
   const getVideoList = async () => {
     try {
-      const response = await fetch("https://yfvideo.hf.free4inno.com/standard/all", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      })
-      const data = await response.json()
-      setStdVideoList(data.videos)
-      console.log("videoList is:", data)
+      const response = await ApiService.motion.getVideoLists()
+      setStdVideoList(response.videos)
     } catch (error) {
       console.error("Error fetching video list:", error)
     }
@@ -72,7 +63,7 @@ const ChooseVideo = ({
       >
         <View style={styles.imageContainer}>
           <Image 
-            source={{ uri: baseURL + `standard/cover/id/${item.numeric_id}` }} 
+            source={{ uri: API_BASE_URL + `/standard/cover/id/${item.numeric_id}` }} 
             style={styles.videoImage} 
             resizeMode="cover"
           />

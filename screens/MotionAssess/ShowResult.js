@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Dimensions, Image } from "react-native"
 import { LineChart } from "react-native-chart-kit"
 import HlsVideo from "./HlsVideo"
-const { width } = Dimensions.get("window")
+import { normalize } from "../utils/MyConfig"
+const { height,width } = Dimensions.get("window")
 const API_BASE_URL = "https://yfvideo.hf.free4inno.com"
 
 const ShowResult = ({ resultData, onReset }) => {
@@ -105,9 +106,8 @@ const ShowResult = ({ resultData, onReset }) => {
                   borderRadius: 16,
                 },
                 propsForDots: {
-                  r: "6",
-                  strokeWidth: "2",
-                  stroke: "#ffa726",
+                  r: "0",
+                  strokeWidth: "0",
                 },
               }}
               bezier
@@ -117,20 +117,27 @@ const ShowResult = ({ resultData, onReset }) => {
               }}
               // 只在每5个点显示点标记
               renderDotContent={({ x, y, index }) => {
-                if (index % 5 === 0) {
+                if (index % 10 === 0) {
                   return (
+                    <View  key={index}>
+                    <Text style={{
+                      position:"absolute",
+                      top:y-normalize(16),
+                      left:x-normalize(10),
+                      color:"#3b82f6",
+                      fontSize:normalize(10)}}>{Math.round(frameScores.datasets[0].data[index])}</Text>
                     <View
-                      key={index}
                       style={{
                         position: "absolute",
-                        top: y - 10,
-                        left: x - 10,
-                        width: 20,
-                        height: 20,
+                        top: y - normalize(5),
+                        left: x - normalize(5),
+                        width: normalize(10),
+                        height: normalize(10),
                         borderRadius: 10,
-                        backgroundColor: "#ffa726",
+                        backgroundColor: "#dbeafebd",
                       }}
                     />
+                    </View>
                   )
                 }
                 return null

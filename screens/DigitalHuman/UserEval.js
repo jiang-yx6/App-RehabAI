@@ -8,9 +8,9 @@ import {
   Dimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/Ionicons"
-const API_BASE_URL = "https://yfvideo.hf.free4inno.com"
+import { API_BASE_URL } from "../utils/MyConfig"
 const { width, height } = Dimensions.get("window")
-
+import ApiService from "../utils/ApiService"
 // 添加响应式设计辅助函数
 const normalize = (size) => {
   return Math.round(size * Math.min(width / 375, height / 812))
@@ -31,7 +31,7 @@ const UserEval = ({isShowEval, isConnected, setIsShowEval, messages, children}) 
 
   }
 
-  const uploadRating = () => {
+  const uploadRating = async () => {
     setShowRating(false);
 
     console.log("rating is:",rating);
@@ -42,24 +42,16 @@ const UserEval = ({isShowEval, isConnected, setIsShowEval, messages, children}) 
                          String(date.getDate()).padStart(2, '0');
     console.log(formattedDate);
 
-    fetch(API_BASE_URL + "/api/feedback/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        rating: rating,
-        messages: messages,
-        date: formattedDate
-      })
+    const response = await ApiService.digitalHumanChat.postFeedback({
+      rating: rating,
+      messages: messages,
+      date: formattedDate
     })
-    .then(response => {response.json()
-          console.log("response is:",response)})
-    
+
+    console.log("response is:",response);
     
     setIsShowEval(false);
     setRating({});
-
   }
 
   // 当聊天窗口关闭时，显示评分界面

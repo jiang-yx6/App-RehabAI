@@ -17,6 +17,8 @@ import {
 import Microphone from "./Microphone"
 import Icon from "react-native-vector-icons/Ionicons"
 import TypingIndicator from "../utils/TypingIndicator"
+import { DIGITAL_HUMAN_URL } from "../utils/MyConfig"
+import ApiService from "../utils/ApiService"
 const { width, height } = Dimensions.get("window")
 
 const ChatView = forwardRef(({ 
@@ -180,24 +182,23 @@ const ChatView = forwardRef(({
     console.log("发送给服务器的文本：", input.trim())
 
     try {
-      const response = await fetch("http://10.3.242.27:8010/human", {
-        body: JSON.stringify({
-          text: input.trim(),
-          type: "chat",
-          interrupt: true,
-          sessionid: sessionId,
-        }),
-        headers: {
-          "Content-Type": "application/json"
-        },
-        method: "POST",
-      })
+      const data = await ApiService.digitalHumanChat.sendMessage({
+        text: input.trim(),
+        sessionid: sessionId,
+        type: "chat",
+        interrupt: true
+      });
 
-      const data = await response.json()
+      
       if (data.llm_response) {
-        console.log("AI响应")
-        // 开始流式输出AI回复
-        startStreaming(data.llm_response)
+        console.log("AI响应:", data.llm_response)
+        // 直接添加AI回复消息
+        const aiResponse = {
+          id: Date.now() + 1,
+          text: data.llm_response,
+          isUser: false,
+        }
+        setMessages((prev) => [...prev, aiResponse])
       } else {
         // 如果没有有效响应，显示错误消息
         const aiResponse = {

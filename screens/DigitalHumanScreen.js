@@ -16,7 +16,9 @@ import {
   Alert,
   ScrollView,
   Animated,
+  Switch
 } from "react-native"
+
 import { useFocusEffect } from "@react-navigation/native"
 import ChatView from "./DigitalHuman/ChatView"
 import { DigitView } from "./DigitalHuman/DigitView"
@@ -25,7 +27,7 @@ import Icon from "react-native-vector-icons/Ionicons"
 import UserEval from "./DigitalHuman/UserEval"
 import Admin from "./DigitalHuman/Admin"
 import WebRTCManager from "./utils/WebRTCManager"
-import Microphone from "./DigitalHuman/Microphone"
+
 const { width, height } = Dimensions.get("window")
 const ChooseVideoTypes = ["肩", "桡骨", "膝", "踝", "俯卧撑","康复操"]
 
@@ -45,6 +47,7 @@ const DigitalHumanScreen = ({ navigation }) => {
   const [isAdmin, setIsAdmin] = useState(false)
   const [showMotionButton, setShowMotionButton] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isThinkingMode, setThinkingMode] = useState(false)
   const [showTypesButtons, setShowTypesButtons] = useState(false)
   const [selectedBodyPart, setSelectedBodyPart] = useState(null)
   const [shouldClearMessages, setShouldClearMessages] = useState(true)
@@ -53,7 +56,7 @@ const DigitalHumanScreen = ({ navigation }) => {
   const audioRef = useRef(null)
   const chatRef = useRef(null)
   const scrollViewRef = useRef(null)
-
+  const lastMessageList = useRef([])
   // 初始化 WebRTC 管理器
   useEffect(() => {
     WebRTCManager.initialize({
@@ -328,20 +331,36 @@ const DigitalHumanScreen = ({ navigation }) => {
 
   const toggleChat = () => {
     console.log(chatRef.current);
+    // 打开评分界面
+    setIsShowEval(!isShowEval);
     if (chatRef.current) {
       setMessages(chatRef.current.getMessages());
+      lastMessageList.current = messages
       setMessages([])
       chatRef.current.clearMessages()
       addWelcomeMessage()
     }
-    // 打开评分界面
-    setIsShowEval(!isShowEval);
   }
+  
   const handleVoiceInput = (text) => {
     console.log("text is:", text)
     setMessages([...messages, {id: Date.now(), text: text, isUser: true}])
   }
 
+
+    //提取思考模式与结果输出    
+  const processMessage = (message) => {
+      const thinkingRegex = /<think>(.*?)<\/think>/s
+      const match = message.match(thinkingRegex)
+
+      if(match){
+          const thinkingContent = match[1].trim()
+          const normalContent = message.replace(thinkingRegex,"").trim()
+          return {thinkingContent, normalContent}
+      }
+
+      return {thinkingContent: null, normalContent: message}
+  }
   return (
     <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -380,7 +399,7 @@ const DigitalHumanScreen = ({ navigation }) => {
           <Icon name="body-outline" size={24} color="#fff" />
         </TouchableOpacity>
 
-        {!isConnected && (
+        {isConnected && (
           <TouchableOpacity style={styles.chatToggleButton} onPress={toggleChat}>
             <Icon name={isShowEval ? "chatbubble" : "chatbubble-outline"} size={24} color="#fff" />
           </TouchableOpacity>
@@ -390,13 +409,19 @@ const DigitalHumanScreen = ({ navigation }) => {
       </SafeAreaView>
       
       <Admin isAdmin={isAdmin} setIsAdmin={setIsAdmin}/>
-      <UserEval isShowEval={isShowEval} isConnected={isConnected} messages={messages} setIsShowEval={setIsShowEval} style={styles.chatToggleButton}/>
+      <UserEval isShowEval={isShowEval} messages={lastMessageList.current} isConnected={isConnected} messages2={messages} setIsShowEval={setIsShowEval} style={styles.chatToggleButton}/>
 
       {/* 聊天视图 - 始终显示 */}
       <View style={[styles.chatContainer]}>
         <View style={styles.chatViewContainer}>
           {/* 展开/收起按钮 */}
           <TouchableOpacity style={styles.expandButton} onPress={() => setIsExpanded(!isExpanded)}>
+            <Switch
+              value={isThinkingMode}
+              onValueChange={setThinkingMode}
+              trackColor={{ false: '#7e7e7e', true: '#4caf50' }}
+              thumbColor="#ffffff"
+            />
             <Icon name={isExpanded ? "chevron-down" : "chevron-up"} size={20} color="#3b82f6" />
             <Text style={styles.expandButtonText}>{isExpanded ? "收起" : "展开"}</Text>
           </TouchableOpacity>
@@ -408,95 +433,94 @@ const DigitalHumanScreen = ({ navigation }) => {
               style={styles.messagesContainer} 
               contentContainerStyle={styles.messagesContent}
             >
-              {messages.map((message) => (
-                <View key={message.id}>
-                  <View style={[styles.messageBubble, message.isUser ? styles.userBubble : styles.aiBubble]}>
-                    <Text style={message.isUser ? styles.userMessageText : styles.aiMessageText}>{message.text}</Text>
-                  </View>
-                  
-                  {/* 显示动作评估按钮 */}
-                  {!message.isUser && message.showMotionButton && (
-                    <TouchableOpacity 
-                      style={styles.motionAssessButton}
-                      onPress = {()=>{
-                        UserChooseVideo()
-                      }}
-                      // onPress={() => navigation.navigate('MotionAssessment')}
-                    >
-                      <LinearGradient
-                        colors={["#4cc9f0", "#4361ee"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.motionButtonGradient}
-                      >
-                        <Icon name="body-outline" size={16} color="#fff" style={styles.buttonIcon} />
-                        <Text style={styles.motionButtonText}>开始动作评估</Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  )}
-                  
-                  {/* 显示身体部位类型按钮 */}
-                  {!message.isUser && message.showTypeButtons && (
-                    <View style={styles.typesButtonsContainer}>
-                      {ChooseVideoTypes.map((type) => (
-                        <TouchableOpacity 
-                          key={type} 
-                          style={[
-                            styles.typeButton,
-                            selectedBodyPart === type && styles.typeButtonSelected
-                          ]}
-                          onPress={() => handleSelectBodyPart(type)}
-                          disabled={selectedBodyPart !== null} // 当有选中的部位时禁用所有按钮
-                        >
-                          <Text 
-                            style={[
-                              styles.typeButtonText,
-                              selectedBodyPart === type && styles.typeButtonTextSelected
-                            ]}
-                          >
-                            {type}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
+              {messages.map((message) => {
+
+                const {thinkingContent, normalContent} = processMessage(message.text)
+
+                return (
+                  <View key={message.id}>
+                    <View style={[styles.messageBubble, message.isUser ? styles.userBubble : styles.aiBubble]}>
+                      {isThinkingMode && !message.isUser && thinkingContent &&  <View style={styles.thinkingMode}><Text style={styles.aiMessageText}>{thinkingContent}</Text></View>}
+                         
+                      <Text style= {message.isUser ? styles.userMessageText: styles.aiMessageText} >{normalContent}</Text>
+                      
                     </View>
-                  )}
-                  
-                  {/* 显示开始评估按钮 */}
-                  {!message.isUser && message.showStartButton && (
-                    <TouchableOpacity 
-                      style={styles.startAssessButton}
-                      onPress={navigateToMotionAssessment}
-                    >
-                      <LinearGradient
-                        colors={["#4cc9f0", "#4361ee"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.motionButtonGradient}
+                    
+                    {/* 显示动作评估按钮 */}
+                    {!message.isUser && message.showMotionButton && (
+                      <TouchableOpacity 
+                        style={styles.motionAssessButton}
+                        onPress = {()=>{
+                          UserChooseVideo()
+                        }}
+                        // onPress={() => navigation.navigate('MotionAssessment')}
                       >
-                        <Icon name="play" size={16} color="#fff" style={styles.buttonIcon} />
-                        <Text style={styles.motionButtonText}>开始进行评估</Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  )}
+                        <LinearGradient
+                          colors={["#4cc9f0", "#4361ee"]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.motionButtonGradient}
+                        >
+                          <Icon name="body-outline" size={16} color="#fff" style={styles.buttonIcon} />
+                          <Text style={styles.motionButtonText}>开始动作评估</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    )}
+                    
+                    {/* 显示身体部位类型按钮 */}
+                    {!message.isUser && message.showTypeButtons && (
+                      <View style={styles.typesButtonsContainer}>
+                        {ChooseVideoTypes.map((type) => (
+                          <TouchableOpacity 
+                            key={type} 
+                            style={[
+                              styles.typeButton,
+                              selectedBodyPart === type && styles.typeButtonSelected
+                            ]}
+                            onPress={() => handleSelectBodyPart(type)}
+                            disabled={selectedBodyPart !== null} // 当有选中的部位时禁用所有按钮
+                          >
+                            <Text 
+                              style={[
+                                styles.typeButtonText,
+                                selectedBodyPart === type && styles.typeButtonTextSelected
+                              ]}
+                            >
+                              {type}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                    
+                    {/* 显示开始评估按钮 */}
+                    {!message.isUser && message.showStartButton && (
+                      <TouchableOpacity 
+                        style={styles.startAssessButton}
+                        onPress={navigateToMotionAssessment}
+                      >
+                        <LinearGradient
+                          colors={["#4cc9f0", "#4361ee"]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={styles.motionButtonGradient}
+                        >
+                          <Icon name="play" size={16} color="#fff" style={styles.buttonIcon} />
+                          <Text style={styles.motionButtonText}>开始进行评估</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    )}
 
 
-                  
-                </View>
-              ))}
+                    
+                  </View>)
+                })}
             </ScrollView>
           </Animated.View>
 
           {/* 输入区域或连接按钮 - 固定在底部 */}
           <View style={styles.inputWrapper}>
             {isConnected ? (
-              <>
-                {/* 加载状态指示器 - 独立显示在 ChatView 上方
-                {chatRef.current?.isLoading && (
-                  <View style={styles.loadingIndicator}>
-                    <ActivityIndicator size="small" color="#3b82f6" />
-                    <Text style={styles.loadingIndicatorText}>AI思考中...</Text>
-                  </View>
-                )} */}
               <ChatView 
                 sessionId={sessionId} 
                 isConnected={isConnected} 
@@ -508,7 +532,6 @@ const DigitalHumanScreen = ({ navigation }) => {
                 ref={chatRef}
                 showOnlyInput={true}
               />
-              </>
             ) : (
               <View style={styles.connectButtonWrapper}>
                 {!isLoading ? (
@@ -729,8 +752,9 @@ const styles = StyleSheet.create({
     paddingBottom: height * 0.015,
   },
   messageBubble: {
-    maxWidth: "80%",
-    padding: width * 0.03,
+    maxWidth: "90%",
+    paddingVertical: height * 0.01,
+    paddingHorizontal: width * 0.02,
     borderRadius: normalize(18),
     marginVertical: height * 0.005,
     position: "relative",
@@ -745,21 +769,28 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     borderTopLeftRadius: normalize(4),
   },
+  thinkingMode:{
+    backgroundColor: "#f5f5f5",
+    marginVertical: normalize(5),
+    padding: normalize(10),
+    borderRadius: normalize(18),
+    alignSelf: "flex-start",
+  },
   userMessageText: {
-    fontSize: normalize(16),
+    fontSize: normalize(12),
     color: "white",
   },
   aiMessageText: {
-    fontSize: normalize(16),
-    color: "#334155",
+    fontSize: normalize(12),
+    color: "#240040",
   },
   inputWrapper: {
     width: "100%",
     padding: width * 0.025,
-    paddingBottom: Platform.OS === "ios" ? height * 0.02 : height * 0.01,
+    paddingBottom: height * 0.01,
     backgroundColor: "rgba(255, 255, 255, 0.95)",
     borderTopWidth: 1,
-    borderTopColor: "rgba(203, 213, 224, 0.5)",
+    borderTopColor: "rgba(7, 7, 7, 0.5)",
   },
   connectButtonWrapper: {
     flexDirection: "row",

@@ -8,7 +8,7 @@ import {
   RTCAudioSession,
 } from "react-native-webrtc"
 import { Platform, PermissionsAndroid } from "react-native"
-
+import { DIGITAL_HUMAN_URL } from "./MyConfig"
 class WebRTCManager {
   constructor() {
     this.peerConnection = null
@@ -29,13 +29,14 @@ class WebRTCManager {
       },
     }
     this.sessionConstraints = {
+      
       mandatory: {
         OfferToReceiveAudio: true,
         OfferToReceiveVideo: true,
         VoiceActivityDetection: true,
       },
     }
-    this.serverUrl = "http://10.3.242.27:8010/offer"
+    this.serverUrl = DIGITAL_HUMAN_URL+"/offer"
   }
 
   // 初始化 WebRTC 相关配置

@@ -23,10 +23,9 @@ import ShowCamera from "./MotionAssess/ShowCamera"
 import ShowResult from "./MotionAssess/ShowResult"
 
 const { width, height } = Dimensions.get("window")
-
+import { API_BASE_URL } from "./utils/MyConfig"
 // Backend API URL
-const API_BASE_URL = "https://yfvideo.hf.free4inno.com"
-
+import ApiService from "./utils/ApiService"
 const MotionAssessmentScreen = ({ navigation, route }) => {
  
   const [selectedStandardVideo, setSelectedStandardVideo] = useState(null)

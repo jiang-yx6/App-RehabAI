@@ -4,9 +4,8 @@ import Icon from "react-native-vector-icons/Ionicons";
 import { LineChart } from 'react-native-chart-kit';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-const API_BASE_URL = "https://yfvideo.hf.free4inno.com"
-
+import { API_BASE_URL } from "../utils/MyConfig"
+import ApiService from "../utils/ApiService"
 const Admin = ({isAdmin, setIsAdmin}) => {
     const [showChat, setShowChat] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -33,18 +32,9 @@ const Admin = ({isAdmin, setIsAdmin}) => {
     // 获取某个特定反馈的聊天记录
     const fetchChatMessages = async (feedbackId) => {
         try {
-            const response = await fetch(`http://192.168.177.27:8000/api/feedback/${feedbackId}/`, {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                }
-            });
-            if (response.ok) {
-                const data = await response.json();
-
-                return data.messages;
-            }
-            return null;
+            const response = await ApiService.digitalHumanChat.getOneFeedback(feedbackId);
+            console.log("response is:",response);
+            return response.messages;
         } catch (error) {
             console.log("获取聊天记录失败:", error);
             return null;
@@ -54,20 +44,9 @@ const Admin = ({isAdmin, setIsAdmin}) => {
     const fetchChatData = async () => {
         try {
             // ${API_BASE_URL}/api/feedback/
-            const response = await fetch("http://192.168.177.27:8000/api/feedback/", {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                console.log("get data:",data)
-                setChatData(data);
-            }else{
-                console.log("error data")
-            }
+            const response = await ApiService.digitalHumanChat.getAllFeedback()
+            console.log("response is:",response);
+            setChatData(response);
         } catch (error) {
             console.log("获取数据失败:", error);
             Alert.alert('错误', '获取数据失败，请稍后重试');
@@ -440,7 +419,7 @@ const styles = StyleSheet.create({
     },
     title: {
         flex: 1,
-        fontSize: SCREEN_WIDTH * 0.02,
+        fontSize: SCREEN_WIDTH * 0.05,
         fontWeight: 'bold',
         color: '#333',
         textAlign: 'center',

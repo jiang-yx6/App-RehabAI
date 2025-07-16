@@ -104,12 +104,12 @@ const Microphone = forwardRef((props, ref) => {
     setRecording(false)
     setStatus("录音结束,发送完数据,请等候,正在识别...")
 
-    // 添加延迟关闭连接，确保所有数据都被处理
-    setTimeout(() => {
-      WebSocketManager.close()
-      setStatus("请点击连接")
-      setIsConnected(false)
-    }, 3000)
+    // // 添加延迟关闭连接，确保所有数据都被处理
+    // setTimeout(() => {
+    //   WebSocketManager.close()
+    //   setStatus("请点击连接")
+    //   setIsConnected(false)
+    // }, 3000)
   }
 
   const handleJsonMessage = (jsonMsg) => {
